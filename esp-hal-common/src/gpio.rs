@@ -1277,6 +1277,609 @@ impl<MODE> embedded_hal_async::digital::Wait for AnyPin<Input<MODE>> {
     }
 }
 
+pub mod wrappers {
+    use core::cell::RefCell;
+
+    use super::{
+        connect_high_to_peripheral,
+        connect_low_to_peripheral,
+        AlternateFunction,
+        DriveStrength,
+        Event,
+        InputPin,
+        InputSignal,
+        OutputPin,
+        OutputSignal,
+        Pin,
+    };
+
+    pub struct InterconnectPin<T>
+    where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin,
+    {
+        pin: RefCell<T>,
+        taken: RefCell<bool>,
+    }
+
+    impl<T> InterconnectPin<T>
+    where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin,
+    {
+        pub fn new(pin: T) -> Self {
+            Self {
+                pin: RefCell::new(pin),
+                taken: RefCell::new(false),
+            }
+        }
+
+        pub fn free(self) -> T {
+            self.pin.into_inner()
+        }
+
+        pub fn get_input(&self) -> InterconnectPinInput<T> {
+            InterconnectPinInput { parent: &self }
+        }
+
+        pub fn get_output(&self) -> Option<InterconnectPinOutput<T>> {
+            let mut taken = self.taken.borrow_mut();
+            if *taken {
+                None
+            } else {
+                *taken = true;
+                Some(InterconnectPinOutput { parent: &self })
+            }
+        }
+    }
+
+    pub struct InterconnectPinInput<'a, T>
+    where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin,
+    {
+        parent: &'a InterconnectPin<T>,
+    }
+
+    impl<'a, T> crate::peripheral::Peripheral for InterconnectPinInput<'a, T>
+    where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin,
+    {
+        type P = InterconnectPinInput<'a, T>;
+
+        unsafe fn clone_unchecked(&mut self) -> Self::P {
+            core::ptr::read(self as *const _)
+        }
+    }
+
+    impl<'a, T> crate::peripheral::sealed::Sealed for InterconnectPinInput<'a, T> where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin
+    {
+    }
+
+    impl<'a, T> Pin for InterconnectPinInput<'a, T>
+    where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin,
+    {
+        fn number(&self) -> u8 {
+            255
+        }
+
+        fn sleep_mode(&mut self, _on: bool) {}
+
+        fn set_alternate_function(&mut self, _alternate: AlternateFunction) {}
+
+        fn is_listening(&self) -> bool {
+            false
+        }
+
+        fn listen_with_options(
+            &mut self,
+            _event: Event,
+            _int_enable: bool,
+            _nmi_enable: bool,
+            _wake_up_from_light_sleep: bool,
+        ) {
+        }
+
+        fn unlisten(&mut self) {}
+
+        fn clear_interrupt(&mut self) {}
+
+        fn is_pcore_interrupt_set(&self) -> bool {
+            false
+        }
+
+        fn is_pcore_non_maskable_interrupt_set(&self) -> bool {
+            false
+        }
+
+        fn is_acore_interrupt_set(&self) -> bool {
+            false
+        }
+
+        fn is_acore_non_maskable_interrupt_set(&self) -> bool {
+            false
+        }
+
+        fn enable_hold(&mut self, _on: bool) {}
+    }
+
+    impl<'a, T> InputPin for InterconnectPinInput<'a, T>
+    where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin,
+    {
+        fn set_to_input(&mut self) -> &mut Self {
+            self
+        }
+
+        fn enable_input(&mut self, _on: bool) -> &mut Self {
+            self
+        }
+
+        fn enable_input_in_sleep_mode(&mut self, _on: bool) -> &mut Self {
+            self
+        }
+
+        fn is_input_high(&self) -> bool {
+            false
+        }
+
+        fn connect_input_to_peripheral_with_options(
+            &mut self,
+            signal: InputSignal,
+            _invert: bool,
+            _force_via_gpio_mux: bool,
+        ) -> &mut Self {
+            self.parent
+                .pin
+                .borrow_mut()
+                .connect_input_to_peripheral_with_options(signal, false, true);
+            self
+        }
+
+        fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal) -> &mut Self {
+            self
+        }
+    }
+
+    pub struct InterconnectPinOutput<'a, T>
+    where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin,
+    {
+        parent: &'a InterconnectPin<T>,
+    }
+
+    impl<'a, T> crate::peripheral::Peripheral for InterconnectPinOutput<'a, T>
+    where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin,
+    {
+        type P = InterconnectPinOutput<'a, T>;
+
+        unsafe fn clone_unchecked(&mut self) -> Self::P {
+            core::ptr::read(self as *const _)
+        }
+    }
+
+    impl<'a, T> crate::peripheral::sealed::Sealed for InterconnectPinOutput<'a, T> where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin
+    {
+    }
+
+    impl<'a, T> Pin for InterconnectPinOutput<'a, T>
+    where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin,
+    {
+        fn number(&self) -> u8 {
+            255
+        }
+
+        fn sleep_mode(&mut self, _on: bool) {}
+
+        fn set_alternate_function(&mut self, _alternate: AlternateFunction) {}
+
+        fn is_listening(&self) -> bool {
+            false
+        }
+
+        fn listen_with_options(
+            &mut self,
+            _event: Event,
+            _int_enable: bool,
+            _nmi_enable: bool,
+            _wake_up_from_light_sleep: bool,
+        ) {
+        }
+
+        fn unlisten(&mut self) {}
+
+        fn clear_interrupt(&mut self) {}
+
+        fn is_pcore_interrupt_set(&self) -> bool {
+            false
+        }
+
+        fn is_pcore_non_maskable_interrupt_set(&self) -> bool {
+            false
+        }
+
+        fn is_acore_interrupt_set(&self) -> bool {
+            false
+        }
+
+        fn is_acore_non_maskable_interrupt_set(&self) -> bool {
+            false
+        }
+
+        fn enable_hold(&mut self, _on: bool) {}
+    }
+
+    impl<'a, T> OutputPin for InterconnectPinOutput<'a, T>
+    where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin,
+    {
+        fn set_to_open_drain_output(&mut self) -> &mut Self {
+            self
+        }
+
+        fn set_to_push_pull_output(&mut self) -> &mut Self {
+            self
+        }
+
+        fn enable_output(&mut self, _on: bool) -> &mut Self {
+            self
+        }
+
+        fn set_output_high(&mut self, _on: bool) -> &mut Self {
+            self
+        }
+
+        fn set_drive_strength(&mut self, _strength: DriveStrength) -> &mut Self {
+            self
+        }
+
+        fn enable_open_drain(&mut self, _on: bool) -> &mut Self {
+            self
+        }
+
+        fn enable_output_in_sleep_mode(&mut self, _on: bool) -> &mut Self {
+            self
+        }
+
+        fn internal_pull_up_in_sleep_mode(&mut self, _on: bool) -> &mut Self {
+            self
+        }
+
+        fn internal_pull_down_in_sleep_mode(&mut self, _on: bool) -> &mut Self {
+            self
+        }
+
+        fn connect_peripheral_to_output_with_options(
+            &mut self,
+            signal: OutputSignal,
+            _invert: bool,
+            _invert_enable: bool,
+            _enable_from_gpio: bool,
+            _force_via_gpio_mux: bool,
+        ) -> &mut Self {
+            self.parent
+                .pin
+                .borrow_mut()
+                .connect_peripheral_to_output_with_options(signal, false, false, false, true);
+            self
+        }
+
+        fn disconnect_peripheral_from_output(&mut self) -> &mut Self {
+            self
+        }
+
+        fn internal_pull_up(&mut self, _on: bool) -> &mut Self {
+            self
+        }
+
+        fn internal_pull_down(&mut self, _on: bool) -> &mut Self {
+            self
+        }
+    }
+
+    #[non_exhaustive]
+    pub struct VirtualInputPin {
+        signal: RefCell<Option<InputSignal>>,
+    }
+
+    impl VirtualInputPin {
+        pub fn new() -> Self {
+            Self {
+                signal: RefCell::new(None),
+            }
+        }
+
+        pub fn input(&self) -> VirtualInput {
+            VirtualInput { parent: self }
+        }
+
+        pub fn set_high(&self) {
+            if let Some(signal) = *self.signal.borrow() {
+                connect_high_to_peripheral(signal);
+            }
+        }
+
+        pub fn set_low(&self) {
+            if let Some(signal) = *self.signal.borrow() {
+                connect_low_to_peripheral(signal);
+            }
+        }
+    }
+
+    pub struct VirtualInput<'a> {
+        parent: &'a VirtualInputPin,
+    }
+
+    impl<'a> crate::peripheral::Peripheral for VirtualInput<'a> {
+        type P = VirtualInput<'a>;
+
+        unsafe fn clone_unchecked(&mut self) -> Self::P {
+            core::ptr::read(self as *const _)
+        }
+    }
+
+    impl<'a> crate::peripheral::sealed::Sealed for VirtualInput<'a> {}
+
+    impl<'a> Pin for VirtualInput<'a> {
+        fn number(&self) -> u8 {
+            255
+        }
+
+        fn sleep_mode(&mut self, _on: bool) {}
+
+        fn set_alternate_function(&mut self, _alternate: AlternateFunction) {}
+
+        fn is_listening(&self) -> bool {
+            false
+        }
+
+        fn listen_with_options(
+            &mut self,
+            _event: Event,
+            _int_enable: bool,
+            _nmi_enable: bool,
+            _wake_up_from_light_sleep: bool,
+        ) {
+        }
+
+        fn unlisten(&mut self) {}
+
+        fn clear_interrupt(&mut self) {}
+
+        fn is_pcore_interrupt_set(&self) -> bool {
+            false
+        }
+
+        fn is_pcore_non_maskable_interrupt_set(&self) -> bool {
+            false
+        }
+
+        fn is_acore_interrupt_set(&self) -> bool {
+            false
+        }
+
+        fn is_acore_non_maskable_interrupt_set(&self) -> bool {
+            false
+        }
+
+        fn enable_hold(&mut self, _on: bool) {}
+    }
+
+    impl<'a> InputPin for VirtualInput<'a> {
+        fn set_to_input(&mut self) -> &mut Self {
+            self
+        }
+
+        fn enable_input(&mut self, _on: bool) -> &mut Self {
+            self
+        }
+
+        fn enable_input_in_sleep_mode(&mut self, _on: bool) -> &mut Self {
+            self
+        }
+
+        fn is_input_high(&self) -> bool {
+            false
+        }
+
+        fn connect_input_to_peripheral_with_options(
+            &mut self,
+            signal: InputSignal,
+            _invert: bool,
+            _force_via_gpio_mux: bool,
+        ) -> &mut Self {
+            *self.parent.signal.borrow_mut() = Some(signal);
+            self
+        }
+
+        fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal) -> &mut Self {
+            *self.parent.signal.borrow_mut() = None;
+            self
+        }
+    }
+
+    pub struct InvertedOutputPin<T>
+    where
+        T: crate::gpio::OutputPin,
+    {
+        pin: T,
+    }
+
+    impl<T> InvertedOutputPin<T>
+    where
+        T: crate::gpio::OutputPin,
+    {
+        pub fn new(pin: T) -> Self {
+            Self { pin }
+        }
+
+        pub fn free(self) -> T {
+            self.pin
+        }
+    }
+
+    impl<T> crate::peripheral::Peripheral for InvertedOutputPin<T>
+    where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin,
+    {
+        type P = InvertedOutputPin<T>;
+
+        unsafe fn clone_unchecked(&mut self) -> Self::P {
+            core::ptr::read(self as *const _)
+        }
+    }
+
+    impl<T> crate::peripheral::sealed::Sealed for InvertedOutputPin<T> where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin
+    {
+    }
+
+    impl<T> Pin for InvertedOutputPin<T>
+    where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin,
+    {
+        fn number(&self) -> u8 {
+            self.pin.number()
+        }
+
+        fn sleep_mode(&mut self, on: bool) {
+            self.pin.sleep_mode(on)
+        }
+
+        fn set_alternate_function(&mut self, alternate: AlternateFunction) {
+            self.pin.set_alternate_function(alternate)
+        }
+
+        fn is_listening(&self) -> bool {
+            self.pin.is_listening()
+        }
+
+        fn listen_with_options(
+            &mut self,
+            event: Event,
+            int_enable: bool,
+            nmi_enable: bool,
+            wake_up_from_light_sleep: bool,
+        ) {
+            self.pin
+                .listen_with_options(event, int_enable, nmi_enable, wake_up_from_light_sleep)
+        }
+
+        fn unlisten(&mut self) {
+            self.pin.unlisten()
+        }
+
+        fn clear_interrupt(&mut self) {
+            self.pin.clear_interrupt()
+        }
+
+        fn is_pcore_interrupt_set(&self) -> bool {
+            self.pin.is_pcore_interrupt_set()
+        }
+
+        fn is_pcore_non_maskable_interrupt_set(&self) -> bool {
+            self.pin.is_pcore_non_maskable_interrupt_set()
+        }
+
+        fn is_acore_interrupt_set(&self) -> bool {
+            self.pin.is_acore_interrupt_set()
+        }
+
+        fn is_acore_non_maskable_interrupt_set(&self) -> bool {
+            self.pin.is_acore_non_maskable_interrupt_set()
+        }
+
+        fn enable_hold(&mut self, on: bool) {
+            self.pin.enable_hold(on)
+        }
+    }
+
+    impl<T> OutputPin for InvertedOutputPin<T>
+    where
+        T: crate::gpio::InputPin + crate::gpio::OutputPin,
+    {
+        fn set_to_open_drain_output(&mut self) -> &mut Self {
+            self.pin.set_to_open_drain_output();
+            self
+        }
+
+        fn set_to_push_pull_output(&mut self) -> &mut Self {
+            self.pin.set_to_push_pull_output();
+            self
+        }
+
+        fn enable_output(&mut self, on: bool) -> &mut Self {
+            self.pin.enable_output(on);
+            self
+        }
+
+        fn set_output_high(&mut self, on: bool) -> &mut Self {
+            self.pin.set_output_high(on);
+            self
+        }
+
+        fn set_drive_strength(&mut self, strength: DriveStrength) -> &mut Self {
+            self.pin.set_drive_strength(strength);
+            self
+        }
+
+        fn enable_open_drain(&mut self, on: bool) -> &mut Self {
+            self.pin.enable_open_drain(on);
+            self
+        }
+
+        fn enable_output_in_sleep_mode(&mut self, on: bool) -> &mut Self {
+            self.pin.enable_output_in_sleep_mode(on);
+            self
+        }
+
+        fn internal_pull_up_in_sleep_mode(&mut self, on: bool) -> &mut Self {
+            self.internal_pull_down_in_sleep_mode(on);
+            self
+        }
+
+        fn internal_pull_down_in_sleep_mode(&mut self, on: bool) -> &mut Self {
+            self.pin.internal_pull_down_in_sleep_mode(on);
+            self
+        }
+
+        fn connect_peripheral_to_output_with_options(
+            &mut self,
+            signal: OutputSignal,
+            _invert: bool,
+            invert_enable: bool,
+            enable_from_gpio: bool,
+            _force_via_gpio_mux: bool,
+        ) -> &mut Self {
+            self.pin.connect_peripheral_to_output_with_options(
+                signal,
+                true,
+                invert_enable,
+                enable_from_gpio,
+                true,
+            );
+            self
+        }
+
+        fn disconnect_peripheral_from_output(&mut self) -> &mut Self {
+            self.pin.disconnect_peripheral_from_output();
+            self
+        }
+
+        fn internal_pull_up(&mut self, on: bool) -> &mut Self {
+            self.pin.internal_pull_up(on);
+            self
+        }
+
+        fn internal_pull_down(&mut self, on: bool) -> &mut Self {
+            self.pin.internal_pull_down(on);
+            self
+        }
+    }
+}
+
 /// General Purpose Input/Output driver
 pub struct IO {
     _io_mux: IO_MUX,
