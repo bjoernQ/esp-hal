@@ -101,6 +101,43 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
             num: u32,
             fixed: u32,
         ) -> i32;
+
+        /// @brief Set ICache mmu mapping.
+        ///        Please do not call this function in your SDK application.
+        ///
+        /// @param  uint32_t ext_ram : MMU_ACCESS_FLASH for flash,
+        /// MMU_ACCESS_SPIRAM for spiram, MMU_INVALID for invalid.
+        ///
+        /// @param  uint32_t vaddr : virtual address in CPU address space.
+        ///                              Can be Iram0,Iram1,Irom0,Drom0 and AHB
+        /// buses address.                              Should be
+        /// aligned by psize.
+        ///
+        /// @param  uint32_t paddr : physical address in external memory.
+        ///                              Should be aligned by psize.
+        ///
+        /// @param  uint32_t psize : page size of ICache, in kilobytes. Should
+        /// be 64 here.
+        ///
+        /// @param  uint32_t num : pages to be set.
+        ///
+        /// @param  uint32_t fixed : 0 for physical pages grow with virtual
+        /// pages, other for virtual pages map to same physical page.
+        ///
+        /// @return uint32_t: error status
+        ///                   0 : mmu set success
+        ///                   2 : vaddr or paddr is not aligned
+        ///                   3 : psize error
+        ///                   4 : vaddr is out of range
+        fn cache_ibus_mmu_set(
+            ext_ram: u32,
+            vaddr: u32,
+            paddr: u32,
+            psize: u32,
+            num: u32,
+            fixed: u32,
+        ) -> i32;
+
     }
     unsafe {
         const MMU_PAGE_SIZE: u32 = 0x10000;
@@ -119,7 +156,7 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
                 break;
             }
         }
-        debug!("PSRAM start address = {:x}", start);
+        info!("PSRAM start address = {:x}", start);
         PSRAM_VADDR = start;
 
         // Configure the mode of instruction cache : cache size, cache line size.
@@ -151,11 +188,32 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
             panic!("cache_dbus_mmu_set failed");
         }
 
+        // THIS IS APPARENLTY NOT NEEDED! RESULTS IN THE SAME MAPPING ANYWAYS!
+        // if cache_ibus_mmu_set(
+        //     MMU_ACCESS_SPIRAM,
+        //     0x4202_0000,
+        //     START_PAGE << 16,
+        //     64,
+        //     PSRAM_SIZE * 1024 / 64, // number of pages to map
+        //     0,
+        // ) != 0
+        // {
+        //     panic!("cache_ibus_mmu_set failed");
+        // }
+
         let extmem = &*esp32s3::EXTMEM::PTR;
         extmem.dcache_ctrl1().modify(|_, w| {
             w.dcache_shut_core0_bus()
                 .clear_bit()
                 .dcache_shut_core1_bus()
+                .clear_bit()
+        });
+
+        // SHOULDN'T BE NEEDED - IS ENABLED BEFORE THE FIRMWARE IS RUN
+        extmem.icache_ctrl1().modify(|_, w| {
+            w.icache_shut_core0_bus()
+                .clear_bit()
+                .icache_shut_core1_bus()
                 .clear_bit()
         });
 

@@ -18,6 +18,7 @@ PROVIDE(Cache_Get_DCache_Line_Size = 0x40001608 );
 PROVIDE(Cache_Invalidate_Addr = 0x400016b0 );
 PROVIDE(Cache_Suspend_DCache = 0x400018b4 );
 PROVIDE(Cache_Resume_DCache = 0x400018c0 );
+PROVIDE(cache_ibus_mmu_set = 0x400019a4 );
 PROVIDE(Cache_Suspend_DCache_Autoload = 0x40001734 );
 PROVIDE(Cache_Resume_DCache_Autoload = 0x40001740 );
 PROVIDE(Cache_WriteBack_Addr = 0x400016c8 );
