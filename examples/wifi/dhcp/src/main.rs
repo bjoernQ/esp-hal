@@ -52,7 +52,10 @@ fn main() -> ! {
         esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI).unwrap();
 
     let mut device = interfaces.sta;
-    let iface = create_interface(&mut device);
+    let mac = device.mac_address();
+
+    let mut device = esp_radio::create_smoltcp_device!(device);
+    let iface = create_interface(&mut device, mac);
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let mut socket_set = SocketSet::new(&mut socket_set_entries[..]);
@@ -167,12 +170,15 @@ fn timestamp() -> smoltcp::time::Instant {
     )
 }
 
-pub fn create_interface(device: &mut esp_radio::wifi::WifiDevice) -> smoltcp::iface::Interface {
+fn create_interface(
+    device: &mut impl smoltcp::phy::Device,
+    mac: [u8; 6],
+) -> smoltcp::iface::Interface {
     // users could create multiple instances but since they only have one WifiDevice
     // they probably can't do anything bad with that
     smoltcp::iface::Interface::new(
         smoltcp::iface::Config::new(smoltcp::wire::HardwareAddress::Ethernet(
-            smoltcp::wire::EthernetAddress::from_bytes(&device.mac_address()),
+            smoltcp::wire::EthernetAddress::from_bytes(&mac),
         )),
         device,
         timestamp(),

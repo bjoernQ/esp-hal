@@ -44,7 +44,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         || cfg!(feature = "csi")
         || cfg!(feature = "esp-now")
         || cfg!(feature = "ieee802154")
-        || cfg!(feature = "smoltcp")
         || cfg!(feature = "sniffer"))
         && !cfg!(feature = "unstable")
         && !suppress_panics

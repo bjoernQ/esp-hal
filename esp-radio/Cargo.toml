@@ -43,10 +43,7 @@ ieee802154 = { version = "0.6.1", optional = true }
 
 # Optional dependencies enabling ecosystem features
 serde = { version = "1.0.218", default-features = false, features = ["derive"], optional = true }
-smoltcp = { version = "0.12.0", default-features = false, features = [
-  "medium-ethernet",
-  "socket-raw",
-], optional = true }
+
 embassy-net-driver = { version = "0.2.0", optional = true }
 bt-hci = { version = "0.4.0", optional = true }
 
@@ -148,8 +145,6 @@ ieee802154 = ["dep:byte", "dep:ieee802154"]
 
 #! ### Ecosystem Feature Flags
 
-## Provide implementations of smoltcp traits
-smoltcp = ["dep:smoltcp"]
 
 ## Implement serde Serialize / Deserialize
 serde = ["dep:serde", "enumset?/serde"]
@@ -159,7 +154,7 @@ serde = ["dep:serde", "enumset?/serde"]
 log-04 = ["dep:log-04", "esp-hal/log-04", "esp-wifi-sys/log"]
 
 ## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
-defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt", "enumset/defmt"]
+defmt = ["dep:defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt", "enumset/defmt"]
 
 #! ### Unstable APIs
 #! Unstable APIs are drivers and features that are not yet ready for general use.

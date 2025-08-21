@@ -20,7 +20,6 @@ esp-preempt = { path = "../../../esp-preempt", features = [
 ] }
 esp-radio = { path = "../../../esp-radio", features = [
     "log-04",
-    "smoltcp",
     "unstable",
     "wifi",
 ] }

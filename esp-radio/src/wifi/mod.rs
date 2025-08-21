@@ -58,9 +58,6 @@ pub(crate) use os_adapter::*;
 use portable_atomic::{AtomicUsize, Ordering};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-#[cfg(all(feature = "smoltcp", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
 pub use state::*;
 
 use crate::{
@@ -1847,7 +1844,7 @@ impl WifiDeviceMode {
     }
 }
 
-/// A wifi device implementing smoltcp's Device trait.
+/// A wifi device
 pub struct WifiDevice<'d> {
     _phantom: PhantomData<&'d ()>,
     mode: WifiDeviceMode,
@@ -1859,16 +1856,12 @@ impl WifiDevice<'_> {
         self.mode.mac_address()
     }
 
-    /// Receives data from the Wi-Fi device (only when `smoltcp` feature is
-    /// disabled).
-    #[cfg(not(feature = "smoltcp"))]
+    /// Receives data from the Wi-Fi device
     pub fn receive(&mut self) -> Option<(WifiRxToken, WifiTxToken)> {
         self.mode.rx_token()
     }
 
-    /// Transmits data through the Wi-Fi device (only when `smoltcp` feature is
-    /// disabled).
-    #[cfg(not(feature = "smoltcp"))]
+    /// Transmits data through the Wi-Fi device
     pub fn transmit(&mut self) -> Option<WifiTxToken> {
         self.mode.tx_token()
     }
@@ -2165,42 +2158,6 @@ impl Sniffer {
     }
 }
 
-// see https://docs.rs/smoltcp/0.7.1/smoltcp/phy/index.html
-#[cfg(all(feature = "smoltcp", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl Device for WifiDevice<'_> {
-    type RxToken<'a>
-        = WifiRxToken
-    where
-        Self: 'a;
-    type TxToken<'a>
-        = WifiTxToken
-    where
-        Self: 'a;
-
-    fn receive(
-        &mut self,
-        _instant: smoltcp::time::Instant,
-    ) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
-        self.mode.rx_token()
-    }
-
-    fn transmit(&mut self, _instant: smoltcp::time::Instant) -> Option<Self::TxToken<'_>> {
-        self.mode.tx_token()
-    }
-
-    fn capabilities(&self) -> smoltcp::phy::DeviceCapabilities {
-        let mut caps = DeviceCapabilities::default();
-        caps.max_transmission_unit = MTU;
-        caps.max_burst_size = if crate::CONFIG.max_burst_size == 0 {
-            None
-        } else {
-            Some(crate::CONFIG.max_burst_size)
-        };
-        caps
-    }
-}
-
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct WifiRxToken {
@@ -2232,16 +2189,28 @@ impl WifiRxToken {
 
         f(buffer)
     }
-}
 
-#[cfg(all(feature = "smoltcp", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl RxToken for WifiRxToken {
-    fn consume<R, F>(self, f: F) -> R
+    pub fn consume_token_non_mut<R, F>(self, f: F) -> R
     where
         F: FnOnce(&[u8]) -> R,
     {
-        self.consume_token(|t| f(t))
+        let mut data = self.mode.data_queue_rx().with(|queue| {
+            unwrap!(
+                queue.pop_front(),
+                "unreachable: transmit()/receive() ensures there is a packet to process"
+            )
+        });
+
+        // We handle the received data outside of the lock because
+        // PacketBuffer::drop must not be called in a critical section.
+        // Dropping an PacketBuffer will call `esp_wifi_internal_free_rx_buffer`
+        // which will try to lock an internal mutex. If the mutex is already
+        // taken, the function will try to trigger a context switch, which will
+        // fail if we are in an interrupt-free context.
+        let buffer = data.as_slice_mut();
+        dump_packet_info(buffer);
+
+        f(buffer)
     }
 }
 
@@ -2272,17 +2241,6 @@ impl WifiTxToken {
         esp_wifi_send_data(self.mode.interface(), buffer);
 
         res
-    }
-}
-
-#[cfg(all(feature = "smoltcp", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl TxToken for WifiTxToken {
-    fn consume<R, F>(self, len: usize, f: F) -> R
-    where
-        F: FnOnce(&mut [u8]) -> R,
-    {
-        self.consume_token(len, f)
     }
 }
 
@@ -3228,3 +3186,77 @@ impl core::future::Future for MultiWifiEventFuture {
         }
     }
 }
+
+#[macro_export]
+macro_rules! create_smoltcp_device {
+    ($radio_device:ident) => {{
+        struct SmoltcpDevice<'a> {
+            device: &'a mut $crate::wifi::WifiDevice<'a>,
+        }
+
+        impl<'a> SmoltcpDevice<'a> {
+            fn new(device: &'a mut $crate::wifi::WifiDevice<'a>) -> Self {
+                Self { device }
+            }
+        }
+
+        struct RxTokenWrapper($crate::wifi::WifiRxToken);
+
+        impl smoltcp::phy::RxToken for RxTokenWrapper {
+            fn consume<R, F>(self, f: F) -> R
+            where
+                F: FnOnce(&[u8]) -> R,
+            {
+                self.0.consume_token_non_mut(f)
+            }
+        }
+
+        struct TxTokenWrapper($crate::wifi::WifiTxToken);
+
+        impl smoltcp::phy::TxToken for TxTokenWrapper {
+            fn consume<R, F>(self, len: usize, f: F) -> R
+            where
+                F: FnOnce(&mut [u8]) -> R,
+            {
+                self.0.consume_token(len, f)
+            }
+        }
+
+        impl<'d> smoltcp::phy::Device for SmoltcpDevice<'d> {
+            type RxToken<'a>
+                = RxTokenWrapper
+            where
+                Self: 'a;
+            type TxToken<'a>
+                = TxTokenWrapper
+            where
+                Self: 'a;
+
+            fn receive(
+                &mut self,
+                _instant: smoltcp::time::Instant,
+            ) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
+                self.device.receive().map(|(rx_token, tx_token)| {
+                    (RxTokenWrapper(rx_token), TxTokenWrapper(tx_token))
+                })
+            }
+
+            fn transmit(&mut self, _instant: smoltcp::time::Instant) -> Option<Self::TxToken<'_>> {
+                self.device
+                    .transmit()
+                    .map(|tx_token| TxTokenWrapper(tx_token))
+            }
+
+            fn capabilities(&self) -> smoltcp::phy::DeviceCapabilities {
+                let mut caps = smoltcp::phy::DeviceCapabilities::default();
+                caps.max_transmission_unit = 1450;
+                caps.max_burst_size = None;
+                caps
+            }
+        }
+
+        SmoltcpDevice::new(&mut $radio_device)
+    }};
+}
+
+pub use create_smoltcp_device;
