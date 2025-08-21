@@ -3249,6 +3249,7 @@ macro_rules! create_smoltcp_device {
 
             fn capabilities(&self) -> smoltcp::phy::DeviceCapabilities {
                 let mut caps = smoltcp::phy::DeviceCapabilities::default();
+                // TODO would need a way to query this from esp-radio
                 caps.max_transmission_unit = 1450;
                 caps.max_burst_size = None;
                 caps
