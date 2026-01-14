@@ -15,23 +15,23 @@
 
 
 /* overwrite */
-lld_acl_rx_ind_handler = 0x40000000;
-lld_con_estab_ind_handler = 0x40000000;
-lld_adv_rep_ind_handler = 0x40000000;
-llm_rpa_renew_to_handler = 0x40000000;
-lld_scan_end_ind_handler = 0x40000000;
-llm_scan_period_to_handler = 0x40000000;
+PROVIDE( lld_acl_rx_ind_handler = 0x40000000 );
+PROVIDE( lld_con_estab_ind_handler = 0x40000000 );
+PROVIDE( lld_adv_rep_ind_handler = 0x40000000 );
+PROVIDE( llm_rpa_renew_to_handler = 0x40000000 );
+PROVIDE( lld_scan_end_ind_handler = 0x40000000 );
+PROVIDE( llm_scan_period_to_handler = 0x40000000 );
 
 /* nvds */
-r_nvds_init = 0x40000000;
-f_nvds_get = 0x40000000;
-f_nvds_del = 0x40000000;
-f_nvds_put = 0x40000000;
+PROVIDE( r_nvds_init = 0x40000000 );
+PROVIDE( f_nvds_get = 0x40000000 );
+PROVIDE( f_nvds_del = 0x40000000 );
+PROVIDE( f_nvds_put = 0x40000000 );
 
 /* controller flash */
-r_flash_init = 0x40000000;
-r_flash_env_init = 0x40000000;
-r_flash_env_deinit = 0x40000000;
+PROVIDE( r_flash_init = 0x40000000 );
+PROVIDE( r_flash_env_init = 0x40000000 );
+PROVIDE( r_flash_env_deinit = 0x40000000 );
 
 /* QA test */
-f_hci_vendor_ble_qa_test_cmd_handler = 0x40000000;
+PROVIDE( f_hci_vendor_ble_qa_test_cmd_handler = 0x40000000 );

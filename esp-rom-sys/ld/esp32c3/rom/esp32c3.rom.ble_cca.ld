@@ -14,18 +14,18 @@
  */
 
 /* SW CCA */
-r_lld_cca_con_evt_start_handle = 0;
-r_lld_hw_cca_end_isr = 0;
-r_lld_hw_cca_isr_eco = 0;
-r_lld_cca_bb_sync_found_handle = 0;
-r_lld_cca_data_reset = 0;
-r_lld_cca_sw_init = 0;
+PROVIDE( r_lld_cca_con_evt_start_handle = 0 );
+PROVIDE( r_lld_hw_cca_end_isr = 0 );
+PROVIDE( r_lld_hw_cca_isr_eco = 0 );
+PROVIDE( r_lld_cca_bb_sync_found_handle = 0 );
+PROVIDE( r_lld_cca_data_reset = 0 );
+PROVIDE( r_lld_cca_sw_init = 0 );
 r_lld_cca_con_evt_end_handle  = 0;
-r_lld_cca_alloc = 0;
-r_lld_cca_sw_alloc = 0;
-r_lld_cca_sw_free = 0;
-r_lld_cca_free = 0;
-r_cca_init = 0;
-r_lld_hw_cca_evt_handler = 0;
-r_lld_sw_cca_evt_handler = 0;
-r_ble_sw_cca_check_isr = 0;
+PROVIDE( r_lld_cca_alloc = 0 );
+PROVIDE( r_lld_cca_sw_alloc = 0 );
+PROVIDE( r_lld_cca_sw_free = 0 );
+PROVIDE( r_lld_cca_free = 0 );
+PROVIDE( r_cca_init = 0 );
+PROVIDE( r_lld_hw_cca_evt_handler = 0 );
+PROVIDE( r_lld_sw_cca_evt_handler = 0 );
+PROVIDE( r_ble_sw_cca_check_isr = 0 );

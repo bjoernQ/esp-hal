@@ -14,9 +14,9 @@
  */
 
 /* DTM */
-f_hci_le_rx_test_cmd_handler = 0x40000000;
-f_hci_le_tx_test_cmd_handler = 0x40000000;
-f_hci_le_enh_rx_test_cmd_handler = 0x40000000;
-f_hci_le_enh_tx_test_cmd_handler = 0x40000000;
-f_hci_le_test_end_cmd_handler = 0x40000000;
-r_lld_test_init = 0x40000000;
+PROVIDE( f_hci_le_rx_test_cmd_handler = 0x40000000 );
+PROVIDE( f_hci_le_tx_test_cmd_handler = 0x40000000 );
+PROVIDE( f_hci_le_enh_rx_test_cmd_handler = 0x40000000 );
+PROVIDE( f_hci_le_enh_tx_test_cmd_handler = 0x40000000 );
+PROVIDE( f_hci_le_test_end_cmd_handler = 0x40000000 );
+PROVIDE( r_lld_test_init = 0x40000000 );

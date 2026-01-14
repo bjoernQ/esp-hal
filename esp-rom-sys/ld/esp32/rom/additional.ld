@@ -1,7 +1,7 @@
-memcmp = 0x4000c260;
-memcpy = 0x4000c2c8;
-memmove = 0x4000c3c0;
-memset = 0x4000c44c;
+PROVIDE( memcmp = 0x4000c260 );
+PROVIDE( memcpy = 0x4000c2c8 );
+PROVIDE( memmove = 0x4000c3c0 );
+PROVIDE( memset = 0x4000c44c );
 
 PROVIDE ( strcpy = 0x400013ac );
 PROVIDE ( abs = 0x40056340 );

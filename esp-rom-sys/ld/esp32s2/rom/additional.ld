@@ -1,13 +1,13 @@
-memcmp = 0x4001ab40;
-memcpy = 0x4001aba8;
-memmove = 0x4001acb0;
-memset = 0x4001ad3c;
+PROVIDE( memcmp = 0x4001ab40 );
+PROVIDE( memcpy = 0x4001aba8 );
+PROVIDE( memmove = 0x4001acb0 );
+PROVIDE( memset = 0x4001ad3c );
 
-strcpy = 0x40007cfc;
-strncpy = 0x40007f20;
-strncmp = 0x4001ae64;
+PROVIDE( strcpy = 0x40007cfc );
+PROVIDE( strncpy = 0x40007f20 );
+PROVIDE( strncmp = 0x4001ae64 );
 
-bzero = 0x400078c8;
+PROVIDE( bzero = 0x400078c8 );
 
 PROVIDE ( cache_dbus_mmu_set = 0x40018eb0 );
 

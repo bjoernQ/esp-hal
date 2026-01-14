@@ -14,7 +14,7 @@
  */
 
 /* master */
-f_hci_le_create_con_cmd_handler = 0x40000000;
-f_hci_le_create_con_cancel_cmd_handler = 0x40000000;
-lld_init_end_ind_handler = 0x40000000;
-r_lld_init_init = 0x40000000;
+PROVIDE( f_hci_le_create_con_cmd_handler = 0x40000000 );
+PROVIDE( f_hci_le_create_con_cancel_cmd_handler = 0x40000000 );
+PROVIDE( lld_init_end_ind_handler = 0x40000000 );
+PROVIDE( r_lld_init_init = 0x40000000 );

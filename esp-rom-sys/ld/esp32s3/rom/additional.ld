@@ -1,13 +1,13 @@
-memset = 0x400011e8;
-memcpy = 0x400011f4;
-memmove = 0x40001200;
-memcmp = 0x4000120c;
+PROVIDE( memset = 0x400011e8 );
+PROVIDE( memcpy = 0x400011f4 );
+PROVIDE( memmove = 0x40001200 );
+PROVIDE( memcmp = 0x4000120c );
 
-strcpy = 0x40001218;
-strncpy = 0x40001224;
-strncmp = 0x4000123c;
+PROVIDE( strcpy = 0x40001218 );
+PROVIDE( strncpy = 0x40001224 );
+PROVIDE( strncmp = 0x4000123c );
 
-bzero = 0x40001260;
+PROVIDE( bzero = 0x40001260 );
 
 PROVIDE(cache_dbus_mmu_set = 0x400019b0);
 PROVIDE( Cache_Suspend_DCache_Autoload = 0x40001734 );
@@ -28,4 +28,4 @@ PROVIDE ( strnlen = __strnlen );
 PROVIDE ( atoi = __atoi );
 PROVIDE ( mktime = __mktime );
 
-syscall_table_ptr = 0x3fceffd4;
+PROVIDE( syscall_table_ptr = 0x3fceffd4 );

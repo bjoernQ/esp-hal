@@ -4,5 +4,5 @@
  *
  * THIS FILE WAS AUTOMATICALLY GENERATED. DO NOT EDIT.
  */
-_rom_chip_id = 0x40000570;
-_rom_eco_version = 0x40000574;
+PROVIDE( _rom_chip_id = 0x40000570 );
+PROVIDE( _rom_eco_version = 0x40000574 );

@@ -16,22 +16,22 @@
 
 /* BLE scan */
 
-f_hci_le_set_scan_param_cmd_handler = 0x40000000;
-f_hci_le_set_scan_en_cmd_handler = 0x40000000;
-f_llm_scan_period_to_handler_hack = 0x40000000;
-f_lld_adv_rep_ind_handler_hack = 0x40000000;
-r_lld_scan_init = 0x40000000;
-r_lld_scan_restart = 0x40000000;
-f_lld_scan_end_ind_handler_hack = 0x40000000;
-r_llm_env_adv_dup_filt_deinit_eco = 0x40000000;
-llm_exception_list_init = 0x40000000;
-llm_duplicate_list_init = 0x40000000;
-f_hci_vendor_ble_update_duplicate_exceptional_list_cmd_handler = 0x40000000;
-f_hci_vendor_ble_init_adv_flow_control_cmd_handler = 0x40000000;
-f_hci_vendor_ble_update_adv_report_flow_control_cmd_handler = 0x40000000;
-coex_schm_ble_scan_stop = 0x40000000;
+PROVIDE( f_hci_le_set_scan_param_cmd_handler = 0x40000000 );
+PROVIDE( f_hci_le_set_scan_en_cmd_handler = 0x40000000 );
+PROVIDE( f_llm_scan_period_to_handler_hack = 0x40000000 );
+PROVIDE( f_lld_adv_rep_ind_handler_hack = 0x40000000 );
+PROVIDE( r_lld_scan_init = 0x40000000 );
+PROVIDE( r_lld_scan_restart = 0x40000000 );
+PROVIDE( f_lld_scan_end_ind_handler_hack = 0x40000000 );
+PROVIDE( r_llm_env_adv_dup_filt_deinit_eco = 0x40000000 );
+PROVIDE( llm_exception_list_init = 0x40000000 );
+PROVIDE( llm_duplicate_list_init = 0x40000000 );
+PROVIDE( f_hci_vendor_ble_update_duplicate_exceptional_list_cmd_handler = 0x40000000 );
+PROVIDE( f_hci_vendor_ble_init_adv_flow_control_cmd_handler = 0x40000000 );
+PROVIDE( f_hci_vendor_ble_update_adv_report_flow_control_cmd_handler = 0x40000000 );
+PROVIDE( coex_schm_ble_scan_stop = 0x40000000 );
 
-f_hci_le_set_ext_scan_param_cmd_handler = 0x40000000;
-f_hci_le_set_ext_scan_en_cmd_handler = 0x40000000;
-r_lld_scan_process_pkt_rx_ext_adv = 0x40000000;
-r_lld_scan_trunc_ind = 0x40000000;
+PROVIDE( f_hci_le_set_ext_scan_param_cmd_handler = 0x40000000 );
+PROVIDE( f_hci_le_set_ext_scan_en_cmd_handler = 0x40000000 );
+PROVIDE( r_lld_scan_process_pkt_rx_ext_adv = 0x40000000 );
+PROVIDE( r_lld_scan_trunc_ind = 0x40000000 );

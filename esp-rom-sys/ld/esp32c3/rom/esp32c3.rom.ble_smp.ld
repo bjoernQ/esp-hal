@@ -14,29 +14,29 @@
  */
 
 /* SMP */
-f_ll_pause_enc_req_handler = 0;
-f_ll_pause_enc_rsp_handler = 0;
-f_ll_enc_req_handler = 0;
-f_ll_enc_rsp_handler = 0;
-f_ll_start_enc_req_handler = 0;
-f_ll_start_enc_rsp_handler = 0;
-f_hci_le_start_enc_cmd_handler = 0;
-f_hci_le_ltk_req_reply_cmd_handler = 0;
-f_hci_le_ltk_req_neg_reply_cmd_handler = 0;
-f_llc_encrypt_ind_handler = 0;
-f_llc_op_encrypt_ind_handler = 0;
-f_hci_le_rd_local_p256_public_key_cmd_handler = 0;
-f_hci_le_generate_dhkey_cmd_handler = 0;
-f_hci_le_enc_cmd_handler = 0;
-r_rwip_crypt_evt_handler = 0;
+PROVIDE( f_ll_pause_enc_req_handler = 0 );
+PROVIDE( f_ll_pause_enc_rsp_handler = 0 );
+PROVIDE( f_ll_enc_req_handler = 0 );
+PROVIDE( f_ll_enc_rsp_handler = 0 );
+PROVIDE( f_ll_start_enc_req_handler = 0 );
+PROVIDE( f_ll_start_enc_rsp_handler = 0 );
+PROVIDE( f_hci_le_start_enc_cmd_handler = 0 );
+PROVIDE( f_hci_le_ltk_req_reply_cmd_handler = 0 );
+PROVIDE( f_hci_le_ltk_req_neg_reply_cmd_handler = 0 );
+PROVIDE( f_llc_encrypt_ind_handler = 0 );
+PROVIDE( f_llc_op_encrypt_ind_handler = 0 );
+PROVIDE( f_hci_le_rd_local_p256_public_key_cmd_handler = 0 );
+PROVIDE( f_hci_le_generate_dhkey_cmd_handler = 0 );
+PROVIDE( f_hci_le_enc_cmd_handler = 0 );
+PROVIDE( r_rwip_crypt_evt_handler = 0 );
 
 /* LE ping */
-f_ll_ping_req_handler = 0;
-f_ll_ping_rsp_handler = 0;
-f_llc_op_le_ping_ind_handler = 0;
-f_llc_auth_payl_nearly_op_handler = 0;
-f_llc_auth_payl_real_to_handler = 0;
-f_llc_auth_payl_nearly_to_handler = 0;
+PROVIDE( f_ll_ping_req_handler = 0 );
+PROVIDE( f_ll_ping_rsp_handler = 0 );
+PROVIDE( f_llc_op_le_ping_ind_handler = 0 );
+PROVIDE( f_llc_auth_payl_nearly_op_handler = 0 );
+PROVIDE( f_llc_auth_payl_real_to_handler = 0 );
+PROVIDE( f_llc_auth_payl_nearly_to_handler = 0 );
 
 /* ecc */
-r_ecc_init = 0;
+PROVIDE( r_ecc_init = 0 );
