@@ -65,7 +65,7 @@ PROVIDE( esp_flash_set_io_mode = 0x40000268 );
 PROVIDE( spi_flash_boot_attach = 0x4000026c );
 PROVIDE( esp_flash_read_chip_id = 0x40000270 );
 PROVIDE( detect_spi_flash_chip = 0x40000274 );
-/* esp_rom_spiflash_write_disable = 0x40000278; */
+PROVIDE( esp_rom_spiflash_write_disable = 0x40000278 );
 PROVIDE( esp_flash_suspend_cmd_init = 0x4000027c );
 /* Data (.data, .bss, .rodata) */
 PROVIDE( esp_flash_default_chip = 0x4087ffe8 );
