@@ -33,7 +33,6 @@ use self::{
     state::*,
 };
 use crate::{
-    InitializationError,
     RadioRefGuard,
     esp_wifi_result,
     hal::ram,
@@ -420,7 +419,7 @@ impl WifiMode {
         let mut mode = wifi_mode_t_WIFI_MODE_NULL;
         esp_wifi_result!(unsafe { esp_wifi_get_mode(&mut mode) })?;
 
-        Self::try_from(mode)
+        Ok(Self::from_raw(mode))
     }
 
     /// Returns true if this mode works as a station.
@@ -438,6 +437,17 @@ impl WifiMode {
             Self::AccessPoint | Self::AccessPointStation => true,
         }
     }
+
+    /// Creates a `WifiMode` from a raw `wifi_mode_t` value.
+    fn from_raw(value: wifi_mode_t) -> Self {
+        #[allow(non_upper_case_globals)]
+        match value {
+            include::wifi_mode_t_WIFI_MODE_STA => Self::Station,
+            include::wifi_mode_t_WIFI_MODE_AP => Self::AccessPoint,
+            include::wifi_mode_t_WIFI_MODE_APSTA => Self::AccessPointStation,
+            _ => panic!("Invalid wifi mode value: {}", value),
+        }
+    }
 }
 
 impl From<&Config> for WifiMode {
@@ -448,34 +458,6 @@ impl From<&Config> for WifiMode {
             Config::AccessPointStation(_, _) => Self::AccessPointStation,
             #[cfg(feature = "wifi-eap")]
             Config::EapStation(_) => Self::Station,
-        }
-    }
-}
-
-#[doc(hidden)]
-impl TryFrom<wifi_mode_t> for WifiMode {
-    type Error = WifiError;
-
-    /// Converts a `wifi_mode_t` C-type into a `WifiMode`.
-    fn try_from(value: wifi_mode_t) -> Result<Self, Self::Error> {
-        #[allow(non_upper_case_globals)]
-        match value {
-            include::wifi_mode_t_WIFI_MODE_STA => Ok(Self::Station),
-            include::wifi_mode_t_WIFI_MODE_AP => Ok(Self::AccessPoint),
-            include::wifi_mode_t_WIFI_MODE_APSTA => Ok(Self::AccessPointStation),
-            _ => Err(WifiError::UnknownWifiMode),
-        }
-    }
-}
-
-#[doc(hidden)]
-impl From<WifiMode> for wifi_mode_t {
-    fn from(val: WifiMode) -> Self {
-        #[allow(non_upper_case_globals)]
-        match val {
-            WifiMode::Station => wifi_mode_t_WIFI_MODE_STA,
-            WifiMode::AccessPoint => wifi_mode_t_WIFI_MODE_AP,
-            WifiMode::AccessPointStation => wifi_mode_t_WIFI_MODE_APSTA,
         }
     }
 }
@@ -843,9 +825,6 @@ pub enum WifiError {
     /// The device disconnected from the network or failed to connect to it.
     Disconnected(DisconnectedStationInfo),
 
-    /// Unknown Wi-Fi mode (not Station/AccessPoint/AccessPointStation).
-    UnknownWifiMode,
-
     /// Unsupported operation or mode.
     Unsupported,
 
@@ -858,32 +837,8 @@ pub enum WifiError {
     /// Out of memory.
     OutOfMemory,
 
-    /// Wi-Fi driver was not initialized or not initialized for `Wi-Fi` operations.
-    NotInitialized,
-
     /// Wi-Fi driver was not started by [esp_wifi_start].
     NotStarted,
-
-    /// Wi-Fi driver was not stopped by [esp_wifi_stop].
-    NotStopped,
-
-    /// Wi-Fi interface error.
-    Interface,
-
-    /// Wi-Fi mode error.
-    Mode,
-
-    /// Wi-Fi internal state error.
-    State,
-
-    /// Wi-Fi internal control block of station or soft-AccessPoint error.
-    ControlBlock,
-
-    /// Wi-Fi internal NVS module error.
-    Nvs,
-
-    /// MAC address is invalid.
-    InvalidMac,
 
     /// SSID is invalid.
     InvalidSsid,
@@ -891,48 +846,8 @@ pub enum WifiError {
     /// Password is invalid.
     InvalidPassword,
 
-    /// Timeout error.
-    Timeout,
-
-    /// Wi-Fi is in sleep state (RF closed) and wakeup failed.
-    WakeFailed,
-
-    /// The operation would block.
-    WouldBlock,
-
     /// Station still in disconnect status.
     NotConnected,
-
-    /// Failed to post the event to Wi-Fi task.
-    PostFail,
-
-    /// Invalid Wi-Fi state when init/deinit is called.
-    InvalidInitState,
-
-    /// Returned when Wi-Fi is stopping.
-    StopState,
-
-    /// The Wi-Fi connection is not associated.
-    NotAssociated,
-
-    /// The Wi-Fi TX is disallowed.
-    TxDisallowed,
-
-    /// An unknown error was reported by the Wi-Fi driver: {0}.
-    // This is here just in case we encounter an unmapped error - there doesn't seem to be a
-    // definitive and exhausting list of errors we should expect and panicking because of an
-    // unmapped error.
-    Unknown(i32),
-
-    /// The current CPU clock frequency is too low.
-    WrongClockConfig,
-
-    /// The scheduler is not initialized.
-    SchedulerNotInitialized,
-
-    #[cfg(esp32)]
-    /// ADC2 is required by esp-radio, but it is in use by esp-hal.
-    Adc2IsUsed,
 }
 
 impl WifiError {
@@ -944,44 +859,16 @@ impl WifiError {
         match code as u32 {
             crate::sys::include::ESP_ERR_NO_MEM => WifiError::OutOfMemory,
             crate::sys::include::ESP_ERR_INVALID_ARG => WifiError::InvalidArguments,
-            crate::sys::include::ESP_ERR_WIFI_NOT_INIT => WifiError::NotInitialized,
             crate::sys::include::ESP_ERR_WIFI_NOT_STARTED => WifiError::NotStarted,
-            crate::sys::include::ESP_ERR_WIFI_NOT_STOPPED => WifiError::NotStopped,
-            crate::sys::include::ESP_ERR_WIFI_IF => WifiError::Interface,
-            crate::sys::include::ESP_ERR_WIFI_MODE => WifiError::Mode,
-            crate::sys::include::ESP_ERR_WIFI_STATE => WifiError::State,
-            crate::sys::include::ESP_ERR_WIFI_CONN => WifiError::ControlBlock,
-            crate::sys::include::ESP_ERR_WIFI_NVS => WifiError::Nvs,
-            crate::sys::include::ESP_ERR_WIFI_MAC => WifiError::InvalidMac,
             crate::sys::include::ESP_ERR_WIFI_SSID => WifiError::InvalidSsid,
             crate::sys::include::ESP_ERR_WIFI_PASSWORD => WifiError::InvalidPassword,
-            crate::sys::include::ESP_ERR_WIFI_TIMEOUT => WifiError::Timeout,
-            crate::sys::include::ESP_ERR_WIFI_WAKE_FAIL => WifiError::WakeFailed,
-            crate::sys::include::ESP_ERR_WIFI_WOULD_BLOCK => WifiError::WouldBlock,
             crate::sys::include::ESP_ERR_WIFI_NOT_CONNECT => WifiError::NotConnected,
-            crate::sys::include::ESP_ERR_WIFI_POST => WifiError::PostFail,
-            crate::sys::include::ESP_ERR_WIFI_INIT_STATE => WifiError::InvalidInitState,
-            crate::sys::include::ESP_ERR_WIFI_STOP_STATE => WifiError::StopState,
-            crate::sys::include::ESP_ERR_WIFI_NOT_ASSOC => WifiError::NotAssociated,
-            crate::sys::include::ESP_ERR_WIFI_TX_DISALLOW => WifiError::TxDisallowed,
-            _ => WifiError::Unknown(code),
+            _ => panic!("Unknown error code: {}", code),
         }
     }
 }
 
 impl core::error::Error for WifiError {}
-
-impl From<InitializationError> for WifiError {
-    fn from(err: InitializationError) -> Self {
-        match err {
-            InitializationError::WifiError(e) => e,
-            InitializationError::SchedulerNotInitialized => WifiError::SchedulerNotInitialized,
-            InitializationError::WrongClockConfig => WifiError::WrongClockConfig,
-            #[cfg(esp32)]
-            InitializationError::Adc2IsUsed => WifiError::Adc2IsUsed,
-        }
-    }
-}
 
 #[cfg(esp32)]
 fn set_mac_time_update_cb(wifi: crate::hal::peripherals::WIFI<'_>) {
@@ -1813,12 +1700,11 @@ pub(crate) fn esp_wifi_send_data(interface: wifi_interface_t, data: &mut [u8]) {
         let len = data.len() as u16;
         let ptr = data.as_mut_ptr().cast();
 
-        let res = unsafe { esp_wifi_result!(esp_wifi_internal_tx(interface, ptr, len)) };
+        let res = unsafe { esp_wifi_internal_tx(interface, ptr, len) };
 
-        if res.is_err() {
+        if res != include::ESP_OK as i32 {
+            warn!("esp_wifi_internal_tx returned error: {}", res);
             decrement_inflight_counter();
-        } else {
-            trace!("esp_wifi_internal_tx ok");
         }
     })
 }
@@ -1839,7 +1725,7 @@ macro_rules! esp_wifi_result {
         if result != $crate::sys::include::ESP_OK as i32 {
             let error = unwrap!(FromPrimitive::from_i32(result));
             warn!(
-                "{} returned an error: {:?} ({})",
+                "{} returned an error: {:?} ({}). If this error is unmapped, please open an issue at <https://github.com/esp-rs/esp-hal/issues>.",
                 stringify!($value),
                 error,
                 result
@@ -2264,7 +2150,7 @@ pub fn new<'d>(
     device: crate::hal::peripherals::WIFI<'d>,
     config: ControllerConfig,
 ) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
-    let _guard = RadioRefGuard::new()?;
+    let _guard = RadioRefGuard::new();
 
     // TODO: Re-check, if not having interrupts disabled pre-condition is still true
     if crate::is_interrupts_disabled() {
