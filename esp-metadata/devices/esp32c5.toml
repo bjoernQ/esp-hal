@@ -641,8 +641,9 @@ combo_module = true
 [device.usb_serial_jtag]
 
 [device.parl_io]
-support_status = "not_supported" # doesn't work
+support_status = "partial"
 version = 2
+# TODO: model chip select signal (active low)
 
 [device.ledc]
 support_status = "not_supported"

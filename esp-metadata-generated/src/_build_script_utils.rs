@@ -1781,6 +1781,7 @@ impl Chip {
                     "interrupts_driver_supported",
                     "io_mux_driver_supported",
                     "lp_i2c_master_driver_supported",
+                    "parl_io_driver_supported",
                     "pcnt_driver_supported",
                     "phy_driver_supported",
                     "rmt_driver_supported",
@@ -2005,6 +2006,7 @@ impl Chip {
                     "cargo:rustc-cfg=interrupts_driver_supported",
                     "cargo:rustc-cfg=io_mux_driver_supported",
                     "cargo:rustc-cfg=lp_i2c_master_driver_supported",
+                    "cargo:rustc-cfg=parl_io_driver_supported",
                     "cargo:rustc-cfg=pcnt_driver_supported",
                     "cargo:rustc-cfg=phy_driver_supported",
                     "cargo:rustc-cfg=rmt_driver_supported",
@@ -5197,6 +5199,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem7)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem8)");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_driver_supported)");
+    println!("cargo:rustc-check-cfg=cfg(parl_io_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(dma_separate_in_out_interrupts)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_can_estimate_nack_reason)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
@@ -5239,7 +5242,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(etm_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(ieee802154_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_driver_supported)");
-    println!("cargo:rustc-check-cfg=cfg(parl_io_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(ulp_riscv_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_soc_root_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpu_hs_div)");
