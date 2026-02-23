@@ -199,8 +199,8 @@ pub async fn ble_task(controller: ExternalController<BleConnector<'static>, 1>) 
     let mut adv_data = [0; 31];
     let adv_len = AdStructure::encode_slice(
         &[
-            AdStructure::CompleteLocalName(esp_hal::chip!().as_bytes()),
             AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
+            AdStructure::CompleteLocalName(esp_hal::chip!().as_bytes()),
         ],
         &mut adv_data[..],
     )

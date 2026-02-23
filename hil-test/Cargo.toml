@@ -119,6 +119,12 @@ portable-atomic    = "1.11"
 static_cell        = { version = "2.1.0" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
 
+trouble-host = { version = "0.6.0", features = [
+    "default-packet-pool-mtu-255",
+    "derive",
+    "scan",
+], optional = true }
+
 crypto-bigint       = { version = "0.5.5", default-features = false }
 digest              = { version = "0.10.7", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }

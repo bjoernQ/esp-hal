@@ -1,4 +1,4 @@
-#[embedded_test::tests(default_timeout = 3)]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use esp_hal::{
         clock::CpuClock,
@@ -7,6 +7,11 @@ mod tests {
         timer::timg::TimerGroup,
     };
     use esp_radio::ble::controller::BleConnector;
+    use trouble_host::prelude::*;
+
+    // GATT Server definition
+    #[gatt_server]
+    struct Server {}
 
     fn read_packet(connector: &mut BleConnector, buf: &mut [u8]) -> usize {
         // Read header
@@ -132,5 +137,59 @@ mod tests {
         core::mem::drop(connector);
 
         esp_hal::delay::Delay::new().delay_millis(10);
+    }
+
+    #[test]
+    async fn test_trouble_starts_advertising(p: Peripherals) {
+        let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+
+        let connector = BleConnector::new(p.BT, Default::default()).unwrap();
+        let controller: ExternalController<_, 1> = ExternalController::new(connector);
+
+        let address: Address = Address::random([0xff, 0x8f, 0x1a, 0x05, 0xe4, 0xff]);
+
+        let mut resources: HostResources<DefaultPacketPool, 1, 1> = HostResources::new();
+        let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
+        let Host { mut peripheral, .. } = stack.build();
+
+        let mut advertiser_data = [0; 31];
+        let len = AdStructure::encode_slice(
+            &[
+                AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
+                AdStructure::ServiceUuids16(&[[0x0f, 0x18]]),
+                AdStructure::CompleteLocalName("Peripheral".as_bytes()),
+            ],
+            &mut advertiser_data[..],
+        )
+        .unwrap();
+
+        let params = Default::default();
+        let res = embassy_time::with_timeout(
+            embassy_time::Duration::from_millis(1000),
+            peripheral.advertise(
+                &params,
+                Advertisement::ConnectableScannableUndirected {
+                    adv_data: &advertiser_data[..len],
+                    scan_data: &[],
+                },
+            ),
+        )
+        .await;
+
+        match res {
+            Ok(res) => match res {
+                Ok(_) => {
+                    panic!("Advertise completed")
+                }
+                Err(err) => {
+                    panic!("Advertise completed with error {:?}", err);
+                }
+            },
+            Err(_err) => {
+                // ok - we expect the timeout
+            }
+        }
     }
 }
