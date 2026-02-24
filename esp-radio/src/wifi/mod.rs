@@ -1,4 +1,18 @@
 //! Wi-Fi
+//!
+//! ## Expected heap memory usage
+//!
+//! These are numbers measured via `esp-alloc`'s "internal-heap-stats" feature.
+//!
+//! You can easily reproduce these measurements with your own application by checking the
+//! `max_usage`.
+//!
+//! Please note that for these measurements the default [ControllerConfig] values are used.
+//! Changing these (especially queue sizes) will change the results.
+//! Also the amount of used memory varies between different targets.
+//!
+//! * Station: 47 - 57k
+//! * Open Access Point: 53 - 63k
 
 use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, str, vec::Vec};
 use core::{
