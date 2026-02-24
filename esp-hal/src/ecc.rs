@@ -31,6 +31,8 @@ use crate::{
     system::{self, GenericPeripheralGuard},
 };
 
+const MEM_BLOCK_SIZE: usize = 32;
+
 /// The ECC Accelerator driver instance
 pub struct Ecc<'d, Dm: DriverMode> {
     ecc: ECC<'d>,
@@ -80,11 +82,27 @@ pub enum Error {
 }
 
 /// Represents supported elliptic curves for cryptographic operations.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EllipticCurve {
     /// The P-192 elliptic curve, a 192-bit curve.
-    P192 = 0,
+    P192,
     /// The P-256 elliptic curve. a 256-bit curve.
-    P256 = 1,
+    P256,
+}
+impl EllipticCurve {
+    fn size_check<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), Error> {
+        let bytes = match self {
+            EllipticCurve::P192 => 24,
+            EllipticCurve::P256 => 32,
+        };
+
+        if params.iter().any(|p| p.len() != bytes) {
+            return Err(Error::SizeMismatchCurve);
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -170,62 +188,22 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     /// from the bitlength of the prime fields of the curve.
     pub fn affine_point_multiplication(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         k: &[u8],
         x: &mut [u8],
         y: &mut [u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || x.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || x.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
-        let mode = WorkMode::PointMultiMode;
+        curve.size_check([k, x, y])?;
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().k_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(x, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
+        self.write_mem_reversed(self.k_mem(), k);
+        self.write_mem_reversed(self.px_mem(), x);
+        self.write_mem_reversed(self.py_mem(), y);
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
-            w.start().set_bit()
-        });
-
-        // wait for interrupt
+        self.start_operation(WorkMode::PointMultiMode, curve);
         while self.is_busy() {}
 
-        self.alignment_helper
-            .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), x);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), y);
+        self.read_mem_reversed(self.px_mem(), x);
+        self.read_mem_reversed(self.py_mem(), y);
 
         Ok(())
     }
@@ -244,52 +222,21 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     #[cfg(esp32c2)]
     pub fn finite_field_division(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         k: &[u8],
         y: &mut [u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
-        let mode = WorkMode::DivisionMode;
+        curve.size_check([k, y])?;
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().k_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
+        self.write_mem_reversed(self.k_mem(), k);
+        self.write_mem_reversed(self.py_mem(), y);
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
-            w.start().set_bit()
-        });
+        self.start_operation(WorkMode::DivisionMode, curve);
 
         // wait for interrupt
         while self.is_busy() {}
 
-        self.alignment_helper
-            .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), y);
+        self.read_mem_reversed(self.py_mem(), y);
 
         Ok(())
     }
@@ -308,53 +255,20 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     /// elliptic curve.
     pub fn affine_point_verification(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         x: &[u8],
         y: &[u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if x.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if x.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
-        let mode = WorkMode::PointVerif;
+        curve.size_check([x, y])?;
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(x, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
+        self.write_mem_reversed(self.px_mem(), x);
+        self.write_mem_reversed(self.py_mem(), y);
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
-            w.start().set_bit()
-        });
+        self.start_operation(WorkMode::PointVerif, curve);
 
         // wait for interrupt
         while self.is_busy() {}
-
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
-        }
+        self.check_point_verification_result()?;
 
         Ok(())
     }
@@ -377,67 +291,25 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     #[cfg(not(ecc_working_modes = "11"))]
     pub fn affine_point_verification_multiplication(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         k: &[u8],
         x: &mut [u8],
         y: &mut [u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || x.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || x.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
-        let mode = WorkMode::PointVerifMulti;
+        curve.size_check([k, x, y])?;
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().k_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(x, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
+        self.write_mem_reversed(self.k_mem(), k);
+        self.write_mem_reversed(self.px_mem(), x);
+        self.write_mem_reversed(self.py_mem(), y);
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
-            w.start().set_bit()
-        });
+        self.start_operation(WorkMode::PointVerifMulti, curve);
 
         // wait for interrupt
         while self.is_busy() {}
+        self.check_point_verification_result()?;
 
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
-        }
-
-        self.alignment_helper
-            .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), x);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), y);
+        self.read_mem_reversed(self.px_mem(), x);
+        self.read_mem_reversed(self.py_mem(), y);
 
         Ok(())
     }
@@ -463,7 +335,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     #[cfg(ecc_working_modes = "11")]
     pub fn affine_point_verification_multiplication(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         k: &[u8],
         px: &mut [u8],
         py: &mut [u8],
@@ -471,71 +343,23 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         qy: &mut [u8],
         qz: &mut [u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || px.len() != 24 || py.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || px.len() != 32 || py.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
-        let mode = WorkMode::PointVerifMulti;
+        curve.size_check([k, px, py])?; //Q?
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().k_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(px, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(py, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
+        self.write_mem_reversed(self.k_mem(), k);
+        self.write_mem_reversed(self.px_mem(), px);
+        self.write_mem_reversed(self.py_mem(), py);
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
-            w.start().set_bit()
-        });
+        self.start_operation(WorkMode::PointVerifMulti, curve);
 
         // wait for interrupt
         while self.is_busy() {}
+        self.check_point_verification_result()?;
 
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
-        }
-
-        self.alignment_helper
-            .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), px);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), py);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qx_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), qx);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qy_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), qy);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qz_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), qz);
+        self.read_mem_reversed(self.px_mem(), px);
+        self.read_mem_reversed(self.py_mem(), py);
+        self.read_mem_reversed(self.qx_mem(), qx);
+        self.read_mem_reversed(self.qy_mem(), qy);
+        self.read_mem_reversed(self.qz_mem(), qz);
 
         Ok(())
     }
@@ -553,76 +377,30 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     /// from the bitlength of the prime fields of the curve.
     pub fn jacobian_point_multiplication(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         k: &mut [u8],
         x: &mut [u8],
         y: &mut [u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || x.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || x.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
-        let mode = WorkMode::JacobianPointMulti;
+        curve.size_check([k, x, y])?;
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().k_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(x, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
+        self.write_mem_reversed(self.k_mem(), k);
+        self.write_mem_reversed(self.px_mem(), x);
+        self.write_mem_reversed(self.py_mem(), y);
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
-            w.start().set_bit()
-        });
+        self.start_operation(WorkMode::JacobianPointMulti, curve);
 
         while self.is_busy() {}
 
         cfg_if::cfg_if! {
             if #[cfg(not(ecc_working_modes = "11"))] {
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), x);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), y);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().k_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), k);
+                self.read_mem_reversed(self.px_mem(), x);
+                self.read_mem_reversed(self.py_mem(), y);
+                self.read_mem_reversed(self.k_mem(), k);
             } else {
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().qx_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), x);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().qy_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), y);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().qz_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), k);
+                self.read_mem_reversed(self.qx_mem(), x);
+                self.read_mem_reversed(self.qy_mem(), y);
+                self.read_mem_reversed(self.qz_mem(), k);
             }
         }
 
@@ -643,65 +421,30 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     /// elliptic curve.
     pub fn jacobian_point_verification(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         x: &[u8],
         y: &[u8],
         z: &[u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if x.len() != 24 || y.len() != 24 || z.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if x.len() != 32 || y.len() != 32 || z.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
-        let mode = WorkMode::JacobianPointVerif;
-
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(x, &mut tmp);
+        curve.size_check([x, y, z])?;
 
         cfg_if::cfg_if! {
             if #[cfg(not(ecc_working_modes = "11"))] {
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().px_mem(0).as_ptr(), tmp.as_ref(), 32);
-                self.reverse_words(y, &mut tmp);
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().py_mem(0).as_ptr(), tmp.as_ref(), 32);
-                self.reverse_words(z, &mut tmp);
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().k_mem(0).as_ptr(), tmp.as_ref(), 32);
+                self.write_mem_reversed(self.px_mem(), x);
+                self.write_mem_reversed(self.py_mem(), y);
+                self.write_mem_reversed(self.k_mem(), z);
             } else {
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().qx_mem(0).as_ptr(), tmp.as_ref(), 32);
-                self.reverse_words(y, &mut tmp);
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().qy_mem(0).as_ptr(), tmp.as_ref(), 32);
-                self.reverse_words(z, &mut tmp);
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().qz_mem(0).as_ptr(), tmp.as_ref(), 32);
+                self.write_mem_reversed(self.qx_mem(), x);
+                self.write_mem_reversed(self.qy_mem(), y);
+                self.write_mem_reversed(self.qz_mem(), z);
             }
         }
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
-            w.start().set_bit()
-        });
+        self.start_operation(WorkMode::JacobianPointVerif, curve);
 
         // wait for interrupt
         while self.is_busy() {}
-
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
-        }
+        self.check_point_verification_result()?;
 
         Ok(())
     }
@@ -723,87 +466,32 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     /// elliptic curve.
     pub fn affine_point_verification_jacobian_multiplication(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         k: &mut [u8],
         x: &mut [u8],
         y: &mut [u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || x.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || x.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
-        let mode = WorkMode::PointVerifJacobianMulti;
+        curve.size_check([k, x, y])?;
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().k_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(x, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
+        self.write_mem_reversed(self.k_mem(), k);
+        self.write_mem_reversed(self.px_mem(), x);
+        self.write_mem_reversed(self.py_mem(), y);
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
-            w.start().set_bit()
-        });
+        self.start_operation(WorkMode::PointVerifJacobianMulti, curve);
 
         // wait for interrupt
         while self.is_busy() {}
-
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
-        }
-
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
-        }
+        self.check_point_verification_result()?;
 
         cfg_if::cfg_if! {
             if #[cfg(not(ecc_working_modes = "11"))] {
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), x);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), y);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().k_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), k);
+                self.read_mem_reversed(self.px_mem(), x);
+                self.read_mem_reversed(self.py_mem(), y);
+                self.read_mem_reversed(self.k_mem(), k);
             } else {
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().qx_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), x);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().qy_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), y);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().qz_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), k);
+                self.read_mem_reversed(self.qx_mem(), x);
+                self.read_mem_reversed(self.qy_mem(), y);
+                self.read_mem_reversed(self.qz_mem(), k);
             }
         }
 
@@ -831,86 +519,31 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     #[cfg(ecc_working_modes = "11")]
     pub fn affine_point_addition(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         px: &mut [u8],
         py: &mut [u8],
         qx: &mut [u8],
         qy: &mut [u8],
         qz: &mut [u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if px.len() != 24
-                    || py.len() != 24
-                    || qx.len() != 24
-                    || qy.len() != 24
-                    || qz.len() != 24
-                {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if px.len() != 32
-                    || py.len() != 32
-                    || qx.len() != 32
-                    || qy.len() != 32
-                    || qz.len() != 32
-                {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
-        let mode = WorkMode::PointAdd;
+        curve.size_check([px, py, qx, qy, qz])?;
 
-        let mut tmp = [0_u8; 32];
+        self.write_mem(self.px_mem(), px);
+        self.write_mem(self.py_mem(), py);
+        self.write_mem(self.qx_mem(), qx);
+        self.write_mem(self.qy_mem(), qy);
+        self.write_mem(self.qz_mem(), qz);
 
-        tmp[0..px.len()].copy_from_slice(px);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().px_mem(0).as_ptr(), &tmp, 32);
-        tmp[0..py.len()].copy_from_slice(py);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().py_mem(0).as_ptr(), &tmp, 32);
-        tmp[0..qx.len()].copy_from_slice(qx);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().qx_mem(0).as_ptr(), &tmp, 32);
-        tmp[0..qy.len()].copy_from_slice(qy);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().qy_mem(0).as_ptr(), &tmp, 32);
-        tmp[0..qz.len()].copy_from_slice(qz);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().qz_mem(0).as_ptr(), &tmp, 32);
-
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
-            w.start().set_bit()
-        });
+        self.start_operation(WorkMode::PointAdd, curve);
 
         // wait for interrupt
         while self.is_busy() {}
 
-        self.alignment_helper
-            .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 32);
-        let mut tmp_len = px.len();
-        px[..].copy_from_slice(&tmp[..tmp_len]);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
-        tmp_len = py.len();
-        py[..].copy_from_slice(&tmp[..tmp_len]);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qx_mem(0).as_ptr(), &mut tmp, 32);
-        tmp_len = qx.len();
-        qx[..].copy_from_slice(&tmp[..tmp_len]);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qy_mem(0).as_ptr(), &mut tmp, 32);
-        tmp_len = qy.len();
-        qy[..].copy_from_slice(&tmp[..tmp_len]);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qz_mem(0).as_ptr(), &mut tmp, 32);
-        tmp_len = qz.len();
-        qz[..].copy_from_slice(&tmp[..tmp_len]);
+        self.read_mem(self.px_mem(), px);
+        self.read_mem(self.py_mem(), py);
+        self.read_mem(self.qx_mem(), qx);
+        self.read_mem(self.qy_mem(), qy);
+        self.read_mem(self.qz_mem(), qz);
 
         Ok(())
     }
@@ -934,62 +567,24 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     #[cfg(ecc_working_modes = "11")]
     pub fn mod_operations(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         a: &mut [u8],
         b: &mut [u8],
         work_mode: WorkMode,
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if a.len() != 24 || b.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if a.len() != 32 || b.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
+        curve.size_check([a, b])?;
 
-        let mut tmp = [0_u8; 32];
-        tmp[0..a.len()].copy_from_slice(a);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().px_mem(0).as_ptr(), &tmp, 32);
-        tmp[0..b.len()].copy_from_slice(b);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().py_mem(0).as_ptr(), &tmp, 32);
+        self.write_mem(self.px_mem(), a);
+        self.write_mem(self.py_mem(), b);
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(work_mode as u8);
-            w.key_length().variant(curve);
-            w.start().set_bit()
-        });
+        self.start_operation(work_mode, curve);
 
         // wait for interrupt
         while self.is_busy() {}
 
         match work_mode {
-            WorkMode::ModAdd | WorkMode::ModSub => {
-                self.alignment_helper.volatile_read_regset(
-                    self.regs().px_mem(0).as_ptr(),
-                    &mut tmp,
-                    32,
-                );
-                let tmp_len = a.len();
-                a[..].copy_from_slice(&tmp[..tmp_len]);
-            }
-            WorkMode::ModMulti | WorkMode::ModDiv => {
-                self.alignment_helper.volatile_read_regset(
-                    self.regs().py_mem(0).as_ptr(),
-                    &mut tmp,
-                    32,
-                );
-                let tmp_len = b.len();
-                b[..].copy_from_slice(&tmp[..tmp_len]);
-            }
+            WorkMode::ModAdd | WorkMode::ModSub => self.read_mem(self.px_mem(), a),
+            WorkMode::ModMulti | WorkMode::ModDiv => self.read_mem(self.py_mem(), b),
             _ => unreachable!(),
         }
 
@@ -1027,5 +622,93 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         for (a, b) in nsrc.chunks_exact(4).zip(ndst.rchunks_exact_mut(4)) {
             b.copy_from_slice(&u32::from_be_bytes(a.try_into().unwrap()).to_ne_bytes());
         }
+    }
+
+    fn start_operation(&self, mode: WorkMode, curve: EllipticCurve) {
+        self.regs().mult_conf().write(|w| unsafe {
+            w.work_mode().bits(mode as u8);
+            w.key_length().variant(match curve {
+                EllipticCurve::P192 => KEY_LENGTH::P192,
+                EllipticCurve::P256 => KEY_LENGTH::P256,
+            });
+            w.start().set_bit()
+        });
+    }
+
+    fn check_point_verification_result(&self) -> Result<(), Error> {
+        if self
+            .regs()
+            .mult_conf()
+            .read()
+            .verification_result()
+            .bit_is_set()
+        {
+            Ok(())
+        } else {
+            self.regs().mult_conf().reset();
+            Err(Error::PointNotOnSelectedCurve)
+        }
+    }
+
+    #[cfg(ecc_working_modes = "11")]
+    fn write_mem(&mut self, ptr: *mut u32, data: &[u8]) {
+        self.alignment_helper
+            .volatile_write_regset(ptr, data, data.len());
+        #[cfg(ecc_zero_extend_writes)]
+        if data.len() < MEM_BLOCK_SIZE {
+            let pad = MEM_BLOCK_SIZE - data.len();
+            self.alignment_helper.volatile_write_regset(
+                ptr.wrapping_byte_add(data.len()),
+                &[0; MEM_BLOCK_SIZE][..pad],
+                pad,
+            );
+        }
+    }
+
+    fn write_mem_reversed(&mut self, ptr: *mut u32, data: &[u8]) {
+        let mut tmp = [0_u8; MEM_BLOCK_SIZE];
+        self.reverse_words(data, &mut tmp);
+        self.alignment_helper
+            .volatile_write_regset(ptr, tmp.as_ref(), MEM_BLOCK_SIZE);
+    }
+
+    #[cfg(ecc_working_modes = "11")]
+    fn read_mem(&mut self, reg: *const u32, out: &mut [u8]) {
+        self.alignment_helper
+            .volatile_read_regset(reg, out, out.len());
+    }
+
+    fn read_mem_reversed(&mut self, reg: *const u32, out: &mut [u8]) {
+        let mut tmp = [0_u8; MEM_BLOCK_SIZE];
+        self.alignment_helper
+            .volatile_read_regset(reg, &mut tmp, MEM_BLOCK_SIZE);
+        self.reverse_words(tmp.as_ref(), out);
+    }
+
+    fn k_mem(&self) -> *mut u32 {
+        self.regs().k_mem(0).as_ptr()
+    }
+
+    fn px_mem(&self) -> *mut u32 {
+        self.regs().px_mem(0).as_ptr()
+    }
+
+    fn py_mem(&self) -> *mut u32 {
+        self.regs().py_mem(0).as_ptr()
+    }
+
+    #[cfg(ecc_working_modes = "11")]
+    fn qx_mem(&self) -> *mut u32 {
+        self.regs().qx_mem(0).as_ptr()
+    }
+
+    #[cfg(ecc_working_modes = "11")]
+    fn qy_mem(&self) -> *mut u32 {
+        self.regs().qy_mem(0).as_ptr()
+    }
+
+    #[cfg(ecc_working_modes = "11")]
+    fn qz_mem(&self) -> *mut u32 {
+        self.regs().qz_mem(0).as_ptr()
     }
 }
