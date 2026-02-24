@@ -70,5 +70,9 @@ unsafe extern "C" fn __esp_phy_esp_dport_access_reg_read(reg: u32) -> u32 {
 #[ram]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __esp_phy_rtc_get_xtal() -> u32 {
-    esp_hal::clock::Clocks::get().xtal_clock.as_mhz()
+    unsafe extern "C" {
+        fn rtc_clk_xtal_freq_get() -> i32;
+    }
+
+    unsafe { rtc_clk_xtal_freq_get() as u32 }
 }

@@ -52,7 +52,11 @@ pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::sys::include::coex_adapter_fu
 #[cfg(coex)]
 #[ram]
 unsafe extern "C" fn xtal_freq_get_wrapper() -> i32 {
-    crate::hal::clock::Clocks::get().xtal_clock.as_mhz() as i32
+    unsafe extern "C" {
+        fn rtc_clk_xtal_freq_get() -> i32;
+    }
+
+    unsafe { rtc_clk_xtal_freq_get() }
 }
 
 #[cfg(coex)]
