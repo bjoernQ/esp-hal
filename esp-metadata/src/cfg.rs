@@ -584,6 +584,11 @@ driver_configs![
             memory_size_bytes: u32,
         }
     },
+    LpTimer {
+        driver: lp_timer,
+        name: "RTC Timekeeping",
+        properties: {}
+    },
     SdHostProperties {
         driver: sd_host,
         name: "SDIO host",

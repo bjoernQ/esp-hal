@@ -890,6 +890,7 @@ deep_sleep = true
 [device.io_mux]
 [device.psram]
 [device.temp_sensor]
+[device.lp_timer]
 
 [device.ulp_fsm]
 
