@@ -74,7 +74,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | I2C master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | I2C slave                 | ❌    |          | ❌       | ❌       | ❌       | ❌       | ❌       | ❌       |
 | I2S                       | ⚒️   |          | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| IEEE 802.15.4             |       |          |          | ❌       | ⚒️      | ⚒️      |          |          |
+| IEEE 802.15.4             |       |          |          | ⚒️      | ⚒️      | ⚒️      |          |          |
 | Interrupts                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | IOMUX                     | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Key Manager               |       |          |          | ❌       |          |          |          |          |
