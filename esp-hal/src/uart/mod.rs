@@ -671,7 +671,7 @@ impl<'d> UartTx<'d, Async> {
             .is_tx_async
             .store(false, Ordering::Release);
         if !self.uart.state().is_rx_async.load(Ordering::Acquire) {
-            self.uart.disable_peri_interrupt();
+            self.uart.disable_peri_interrupt_on_all_cores();
         }
 
         UartTx {
@@ -1045,7 +1045,7 @@ impl<'d> UartRx<'d, Async> {
             .is_rx_async
             .store(false, Ordering::Release);
         if !self.uart.state().is_tx_async.load(Ordering::Acquire) {
-            self.uart.disable_peri_interrupt();
+            self.uart.disable_peri_interrupt_on_all_cores();
         }
 
         UartRx {
@@ -2977,6 +2977,7 @@ pub trait Instance: crate::private::Sealed + any::Degrade {
 /// Peripheral data describing a particular UART instance.
 #[doc(hidden)]
 #[non_exhaustive]
+#[allow(private_interfaces, reason = "Unstable details")]
 pub struct Info {
     /// Pointer to the register block for this UART instance.
     ///
@@ -3818,12 +3819,12 @@ impl AnyUart<'_> {
         any::delegate!(self, uart => { uart.bind_peri_interrupt(handler) })
     }
 
-    fn disable_peri_interrupt(&self) {
-        any::delegate!(self, uart => { uart.disable_peri_interrupt() })
+    fn disable_peri_interrupt_on_all_cores(&self) {
+        any::delegate!(self, uart => { uart.disable_peri_interrupt_on_all_cores() })
     }
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
-        self.disable_peri_interrupt();
+        self.disable_peri_interrupt_on_all_cores();
 
         self.info().enable_listen(EnumSet::all(), false);
         self.info().clear_interrupts(EnumSet::all());

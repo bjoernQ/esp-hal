@@ -950,7 +950,7 @@ impl<'d> I2c<'d, Async> {
     /// See the [`Blocking`] documentation for an example on how to use this
     /// method.
     pub fn into_blocking(self) -> I2c<'d, Blocking> {
-        self.i2c.disable_peri_interrupt();
+        self.i2c.disable_peri_interrupt_on_all_cores();
 
         I2c {
             i2c: self.i2c,
@@ -1499,6 +1499,7 @@ fn configure_clock(
 #[doc(hidden)]
 #[derive(Debug)]
 #[non_exhaustive]
+#[allow(private_interfaces, reason = "Unstable details")]
 pub struct Info {
     /// Numeric instance id (0 = I2C0, 1 = I2C1, ...)
     #[cfg(soc_has_i2c1)]
@@ -3369,12 +3370,12 @@ impl AnyI2c<'_> {
         any::delegate!(self, i2c => { i2c.bind_peri_interrupt(handler) })
     }
 
-    fn disable_peri_interrupt(&self) {
-        any::delegate!(self, i2c => { i2c.disable_peri_interrupt() })
+    fn disable_peri_interrupt_on_all_cores(&self) {
+        any::delegate!(self, i2c => { i2c.disable_peri_interrupt_on_all_cores() })
     }
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
-        self.disable_peri_interrupt();
+        self.disable_peri_interrupt_on_all_cores();
 
         self.info().enable_listen(EnumSet::all(), false);
         self.info().clear_interrupts(EnumSet::all());

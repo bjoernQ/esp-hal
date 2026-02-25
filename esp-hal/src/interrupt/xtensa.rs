@@ -1,17 +1,11 @@
 //! Interrupt handling
 
-use xtensa_lx::interrupt;
 #[cfg(esp32)]
 pub(crate) use xtensa_lx::interrupt::free;
-#[cfg(feature = "rt")]
-use xtensa_lx_rt::exception::Context;
 
-use super::InterruptStatus;
 use crate::{
     interrupt::{PriorityError, RunLevel},
-    pac,
     peripherals::Interrupt,
-    system::Cpu,
 };
 
 /// Enumeration of available CPU interrupts
@@ -21,6 +15,7 @@ use crate::{
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u32)]
+#[instability::unstable]
 pub enum CpuInterrupt {
     /// Level-triggered interrupt with priority 1.
     Interrupt0LevelPriority1      = 0,
@@ -105,6 +100,7 @@ impl CpuInterrupt {
     }
 
     #[inline]
+    #[cfg(feature = "rt")]
     pub(crate) fn is_vectored(self) -> bool {
         // Even "direct bound" interrupts go through the vectored interrupt handler
         true
@@ -112,18 +108,21 @@ impl CpuInterrupt {
 
     /// Enable the CPU interrupt
     #[inline]
+    #[instability::unstable]
     pub fn enable(self) {
         enable_cpu_interrupt_raw(self as u32);
     }
 
     /// Clear the CPU interrupt status bit
     #[inline]
+    #[instability::unstable]
     pub fn clear(self) {
         unsafe { xtensa_lx::interrupt::clear(1 << self as u32) };
     }
 
     /// Get interrupt priority for the CPU
     #[inline]
+    #[instability::unstable]
     pub fn priority(self) -> Priority {
         match self {
             CpuInterrupt::Interrupt0LevelPriority1
@@ -156,15 +155,20 @@ impl CpuInterrupt {
     }
 
     #[inline]
+    #[cfg(feature = "rt")]
     pub(crate) fn level(self) -> u32 {
         self.priority() as u32
     }
 }
 
 /// Interrupt priority levels.
+///
+/// A higher numeric value means higher priority. Interrupt requests at higher priority levels will
+/// be able to preempt code running at a lower [`RunLevel`][super::RunLevel].
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum Priority {
     /// Priority level 1.
     Priority1 = 1,
@@ -178,6 +182,7 @@ pub enum Priority {
 
 impl Priority {
     /// Maximum interrupt priority
+    #[instability::unstable]
     pub const fn max() -> Priority {
         Priority::Priority3
     }
@@ -186,13 +191,9 @@ impl Priority {
     pub const fn min() -> Priority {
         Priority::Priority1
     }
-}
 
-impl TryFrom<u32> for Priority {
-    type Error = PriorityError;
-
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
-        match value {
+    pub(crate) fn try_from_u32(priority: u32) -> Result<Self, PriorityError> {
+        match priority {
             1 => Ok(Priority::Priority1),
             2 => Ok(Priority::Priority2),
             3 => Ok(Priority::Priority3),
@@ -201,6 +202,16 @@ impl TryFrom<u32> for Priority {
     }
 }
 
+#[instability::unstable]
+impl TryFrom<u32> for Priority {
+    type Error = PriorityError;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        Self::try_from_u32(value)
+    }
+}
+
+#[instability::unstable]
 impl TryFrom<u8> for Priority {
     type Error = PriorityError;
 
@@ -225,7 +236,7 @@ pub(crate) fn current_runlevel() -> RunLevel {
     let ps: u32;
     unsafe { core::arch::asm!("rsr.ps {0}", out(reg) ps) };
 
-    unwrap!(RunLevel::try_from(ps & 0x0F))
+    unwrap!(RunLevel::try_from_u32(ps & 0x0F))
 }
 
 /// Changes the current run level (the level below which interrupts are
@@ -253,7 +264,7 @@ pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
         };
     }
 
-    unwrap!(RunLevel::try_from(token & 0x0F))
+    unwrap!(RunLevel::try_from_u32(token & 0x0F))
 }
 
 /// Wait for an interrupt to occur.
@@ -262,6 +273,7 @@ pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
 /// (WFI or equivalent) instruction. After executing this function, the CPU core
 /// will stop execution until an interrupt occurs.
 #[inline(always)]
+#[instability::unstable]
 pub fn wait_for_interrupt() {
     unsafe { core::arch::asm!("waiti 0") };
 }
@@ -341,9 +353,10 @@ pub(crate) unsafe fn init_vectoring() {
 #[cfg(feature = "rt")]
 pub(crate) mod rt {
     use procmacros::ram;
-    use xtensa_lx_rt::interrupt::CpuInterruptLevel;
+    use xtensa_lx_rt::{exception::Context, interrupt::CpuInterruptLevel};
 
     use super::*;
+    use crate::{interrupt::InterruptStatus, system::Cpu};
 
     #[cfg_attr(place_switch_tables_in_ram, ram)]
     pub(crate) static CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
@@ -405,8 +418,9 @@ pub(crate) mod rt {
 
     #[inline(always)]
     unsafe fn handle_interrupts<const LEVEL: u32>(save_frame: &mut Context) {
-        let cpu_interrupt_mask =
-            interrupt::get() & interrupt::get_mask() & CPU_INTERRUPT_LEVELS[LEVEL as usize];
+        let cpu_interrupt_mask = xtensa_lx::interrupt::get()
+            & xtensa_lx::interrupt::get_mask()
+            & CPU_INTERRUPT_LEVELS[LEVEL as usize];
 
         if cpu_interrupt_mask & CPU_INTERRUPT_INTERNAL != 0 {
             // Let's handle CPU-internal interrupts (NMI, Timer, Software, Profiling).
@@ -422,7 +436,7 @@ pub(crate) mod rt {
             // side.
             if ((1 << cpu_interrupt_nr) & CPU_INTERRUPT_EDGE) != 0 {
                 unsafe {
-                    interrupt::clear(1 << cpu_interrupt_nr);
+                    xtensa_lx::interrupt::clear(1 << cpu_interrupt_nr);
                 }
             }
 
@@ -451,7 +465,7 @@ pub(crate) mod rt {
             for interrupt_nr in status.iterator().filter(|&interrupt_nr| {
                 crate::interrupt::should_handle(core, interrupt_nr as u32, LEVEL)
             }) {
-                let handler = unsafe { pac::__INTERRUPTS[interrupt_nr as usize]._handler };
+                let handler = unsafe { crate::pac::__INTERRUPTS[interrupt_nr as usize]._handler };
                 let handler: fn(&mut Context) = unsafe {
                     core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler)
                 };
