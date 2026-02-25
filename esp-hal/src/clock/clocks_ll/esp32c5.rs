@@ -69,8 +69,16 @@ pub(super) fn enable_ieee802154(en: bool) {
 
 #[allow(unused)]
 pub(super) fn enable_bt(en: bool) {
-    // TODO
-    enable_wifi(en);
+    MODEM_SYSCON::regs().clk_conf1().modify(|_, w| {
+        w.clk_bt_apb_en().set_bit();
+        w.clk_btbb_en().set_bit();
+        w.clk_btmac_en().set_bit();
+        w.clk_fe_apb_en().set_bit();
+        w.clk_fe_20m_en().set_bit();
+        w.clk_fe_40m_en().set_bit();
+        w.clk_fe_80m_en().set_bit();
+        w.clk_fe_160m_en().set_bit()
+    });
 }
 
 #[allow(unused)]
