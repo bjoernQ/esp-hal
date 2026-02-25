@@ -269,7 +269,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_ll_rsp_dup_list_count: config.ll_rsp_dup_list_count,
         ble_ll_adv_dup_list_count: config.ll_adv_dup_list_count,
         ble_ll_tx_pwr_dbm: config.default_tx_power.dbm() as u8,
-        rtc_freq: 32000,
+        rtc_freq: 32768,
         ble_ll_sca: 60,
         ble_ll_scan_phy_number: 2,
         ble_ll_conn_def_auth_pyld_tmo: 3000,
@@ -300,9 +300,9 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_scan_classify_filter_enable: 1,
         cca_drop_mode: 0,  //???
         cca_low_tx_pwr: 0, //???
-        main_xtal_freq: 40,
+        main_xtal_freq: 48,
         ignore_wl_for_direct_adv: 0,
-        cpu_freq_mhz: 160,
+        cpu_freq_mhz: 240,
         enable_pcl: 0, // CONFIG_BT_LE_POWER_CONTROL_ENABLED
         csa2_select: 1,
         enable_csr: 0,

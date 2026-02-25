@@ -69,11 +69,21 @@ pub(super) fn enable_ieee802154(en: bool) {
 
 #[allow(unused)]
 pub(super) fn enable_bt(en: bool) {
+    MODEM_SYSCON::regs().clk_conf().modify(|r, w| {
+        w.clk_etm_en().bit(en);
+        w.clk_modem_sec_en().bit(en);
+        w.clk_modem_sec_ecb_en().bit(en);
+        w.clk_modem_sec_ccm_en().bit(en);
+        w.clk_modem_sec_bah_en().bit(en);
+        w.clk_modem_sec_apb_en().bit(en);
+        w.clk_ble_timer_en().bit(en)
+    });
+
     MODEM_SYSCON::regs().clk_conf1().modify(|_, w| {
+        w.clk_fe_apb_en().set_bit();
         w.clk_bt_apb_en().set_bit();
         w.clk_btbb_en().set_bit();
         w.clk_btmac_en().set_bit();
-        w.clk_fe_apb_en().set_bit();
         w.clk_fe_20m_en().set_bit();
         w.clk_fe_40m_en().set_bit();
         w.clk_fe_80m_en().set_bit();
