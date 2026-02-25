@@ -15,6 +15,7 @@ use crate::{
 };
 
 #[cfg_attr(esp32c2, path = "os_adapter_esp32c2.rs")]
+#[cfg_attr(esp32c5, path = "os_adapter_esp32c5.rs")]
 #[cfg_attr(esp32c6, path = "os_adapter_esp32c6.rs")]
 #[cfg_attr(esp32h2, path = "os_adapter_esp32h2.rs")]
 pub(crate) mod ble_os_adapter_chip_specific;
@@ -321,7 +322,7 @@ pub(crate) struct ExtFuncsT {
     os_random: Option<unsafe extern "C" fn() -> u32>,
     ecc_gen_key_pair: Option<unsafe extern "C" fn(*const u8, *const u8) -> i32>,
     ecc_gen_dh_key: Option<unsafe extern "C" fn(*const u8, *const u8, *const u8, *const u8) -> i32>,
-    #[cfg(not(esp32h2))]
+    #[cfg(not(any(esp32h2, esp32c5)))]
     esp_reset_rpa_moudle: Option<unsafe extern "C" fn()>,
     #[cfg(esp32c2)]
     esp_bt_track_pll_cap: Option<unsafe extern "C" fn()>,
@@ -357,7 +358,7 @@ static G_OSI_FUNCS: ExtFuncsT = ExtFuncsT {
     os_random: Some(os_random),
     ecc_gen_key_pair: Some(ecc_gen_key_pair),
     ecc_gen_dh_key: Some(ecc_gen_dh_key),
-    #[cfg(not(esp32h2))]
+    #[cfg(not(any(esp32h2, esp32c5)))]
     esp_reset_rpa_moudle: Some(self::ble_os_adapter_chip_specific::esp_reset_rpa_moudle),
     #[cfg(esp32c2)]
     esp_bt_track_pll_cap: None,
@@ -1223,13 +1224,17 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
     }
 
     // At some point the "High-speed ADC" entropy source became available.
-    unsafe { esp_hal::rng::TrngSource::increase_entropy_source_counter() };
+    #[cfg(rng_trng_supported)]
+    unsafe {
+        esp_hal::rng::TrngSource::increase_entropy_source_counter()
+    };
 
     debug!("The ble_controller_init was initialized");
     phy_init_guard
 }
 
 pub(crate) fn ble_deinit() {
+    #[cfg(rng_trng_supported)]
     esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
         esp_hal::Internal::conjure()
     });

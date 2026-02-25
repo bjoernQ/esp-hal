@@ -627,7 +627,7 @@ mac_version = 3
 has_5g = true
 
 [device.bt]
-support_status = "not_supported"
+support_status = "partial"
 controller = "npl"
 
 [device.ieee802154]

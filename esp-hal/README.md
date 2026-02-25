@@ -60,7 +60,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ASSIST_DEBUG              |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      |
 | Analog Voltage Comparator |       |          |          | ❌       |          |          |          |          |
 | Bit Scrambler             |       |          |          | ❌       |          |          |          |          |
-| Bluetooth                 | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      |          | ⚒️      |
+| Bluetooth                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      |
 | Camera interface          | ❌    |          |          |          |          |          | ❌       | ⚒️      |
 | DAC                       | ⚒️   |          |          |          |          |          | ⚒️      |          |
 | Dedicated GPIO            |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |

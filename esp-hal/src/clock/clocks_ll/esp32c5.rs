@@ -69,7 +69,8 @@ pub(super) fn enable_ieee802154(en: bool) {
 
 #[allow(unused)]
 pub(super) fn enable_bt(en: bool) {
-    todo!()
+    // TODO
+    enable_wifi(en);
 }
 
 #[allow(unused)]
