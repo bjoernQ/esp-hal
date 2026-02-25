@@ -851,9 +851,6 @@ pub enum WifiError {
     /// Out of memory.
     OutOfMemory,
 
-    /// Wi-Fi driver was not started by [esp_wifi_start].
-    NotStarted,
-
     /// SSID is invalid.
     InvalidSsid,
 
@@ -873,7 +870,6 @@ impl WifiError {
         match code as u32 {
             crate::sys::include::ESP_ERR_NO_MEM => WifiError::OutOfMemory,
             crate::sys::include::ESP_ERR_INVALID_ARG => WifiError::InvalidArguments,
-            crate::sys::include::ESP_ERR_WIFI_NOT_STARTED => WifiError::NotStarted,
             crate::sys::include::ESP_ERR_WIFI_SSID => WifiError::InvalidSsid,
             crate::sys::include::ESP_ERR_WIFI_PASSWORD => WifiError::InvalidPassword,
             crate::sys::include::ESP_ERR_WIFI_NOT_CONNECT => WifiError::NotConnected,
@@ -2012,7 +2008,7 @@ impl CountryInfo {
 }
 
 /// Wi-Fi configuration.
-#[derive(Clone, Copy, BuilderLite, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, BuilderLite, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ControllerConfig {
     /// Country info.
@@ -2108,6 +2104,10 @@ pub struct ControllerConfig {
     /// stations and APs.
     #[builder_lite(unstable)]
     rx_ba_win: u8,
+
+    /// Initial Wi-Fi configuration.
+    #[builder_lite(reference)]
+    initial_config: Config,
 }
 
 impl Default for ControllerConfig {
@@ -2129,6 +2129,8 @@ impl Default for ControllerConfig {
             rx_ba_win: 6,
 
             country_info: CountryInfo::from(*b"CN"),
+
+            initial_config: Config::Station(StationConfig::default()),
         }
     }
 }
@@ -2145,7 +2147,8 @@ impl ControllerConfig {
 }
 
 #[procmacros::doc_replace]
-/// Create a Wi-Fi controller and it's associated interfaces.
+/// Create a Wi-Fi controller and it's associated interfaces. The default initial configuration is
+/// [Config::Station(StationConfig::default())].
 ///
 /// Dropping the controller will deinitialize / stop Wi-Fi.
 ///
@@ -2156,8 +2159,7 @@ impl ControllerConfig {
 ///
 /// ```rust,no_run
 /// # {before_snippet}
-/// let (controller, interfaces) =
-///     esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
+/// let (controller, interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
 /// # {after_snippet}
 /// ```
 pub fn new<'d>(
@@ -2244,6 +2246,8 @@ pub fn new<'d>(
     // Set a sane default power saving mode. The blob default is not the best for bandwidth.
     controller.set_power_saving(PowerSaveMode::default())?;
 
+    controller.set_config(&config.initial_config)?;
+
     Ok((
         controller,
         Interfaces {
@@ -2265,8 +2269,10 @@ pub fn new<'d>(
 
 /// Wi-Fi controller.
 ///
-/// After initial creation via [new] the controller is in stopped state.
-/// Use [WifiController::set_config] to set the configuration and start the controller.
+/// Calling [new] starts the controller.
+///
+/// When the controller is dropped, the Wi-Fi driver is
+/// deinitialized and Wi-Fi is stopped.
 #[non_exhaustive]
 pub struct WifiController<'d> {
     _guard: RadioRefGuard,
@@ -2323,15 +2329,14 @@ impl WifiController<'_> {
     ///
     /// ```rust,no_run
     /// # {before_snippet}
-    /// # use esp_radio::wifi::{ap::AccessPointConfig, Config};
+    /// # use esp_radio::wifi::{ap::AccessPointConfig, Config, ControllerConfig};
     /// use esp_radio::wifi::Protocols;
     ///
-    /// let (mut wifi_controller, _interfaces) =
-    ///     esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
-    ///
-    /// wifi_controller.set_config(&Config::AccessPoint(
+    /// let controller_config = ControllerConfig::default().with_initial_config(Config::AccessPoint(
     ///     AccessPointConfig::default().with_ssid("esp-radio"),
-    /// ))?;
+    /// ));
+    /// let (mut wifi_controller, _interfaces) =
+    ///     esp_radio::wifi::new(peripherals.WIFI, controller_config)?;
     ///
     /// wifi_controller.set_protocols(Protocols::default());
     /// # {after_snippet}
@@ -2588,10 +2593,6 @@ band.
     #[instability::unstable]
     pub fn set_band_mode(&mut self, band_mode: BandMode) -> Result<(), WifiError> {
         // Wi-Fi needs to be started in order to set the band mode
-        if !self.is_started() {
-            return Err(WifiError::NotStarted);
-        }
-
         esp_wifi_result!(unsafe { esp_wifi_set_band_mode(band_mode.to_raw()) })
     }
 
@@ -2710,40 +2711,6 @@ ignored.",
 
         // TODO: implement ROAMING
         esp_wifi_result!(unsafe { esp_wifi_disconnect_internal() })
-    }
-
-    #[procmacros::doc_replace]
-    /// Checks if the Wi-Fi controller is started. Returns true if Station and/or AccessPoint are
-    /// started.
-    /// ## Example
-    ///
-    /// ```rust,no_run
-    /// # {before_snippet}
-    /// # let (controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
-    /// if controller.is_started() {
-    ///     println!("Wi-Fi is started");
-    /// } else {
-    ///     println!("Wi-Fi is not started");
-    /// }
-    /// # {after_snippet}
-    /// ```
-    #[instability::unstable]
-    pub fn is_started(&self) -> bool {
-        if matches!(
-            crate::wifi::station_state(),
-            WifiStationState::Started
-                | WifiStationState::Connected
-                | WifiStationState::Disconnected
-        ) {
-            return true;
-        }
-        if matches!(
-            crate::wifi::access_point_state(),
-            WifiAccessPointState::Started
-        ) {
-            return true;
-        }
-        false
     }
 
     #[procmacros::doc_replace]
