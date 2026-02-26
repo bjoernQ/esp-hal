@@ -32,6 +32,8 @@ fn main() -> ! {
             let (tx_pin, rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);
         } else if #[cfg(feature = "esp32h2")] {
             let (tx_pin, rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);
+        } else if #[cfg(feature = "esp32c5")] {
+            let (tx_pin, rx_pin) = (peripherals.GPIO11, peripherals.GPIO12);
         }
     }
 
