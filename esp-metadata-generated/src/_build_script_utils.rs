@@ -1716,6 +1716,7 @@ impl Chip {
                     "soc_has_i2c_ana_mst",
                     "soc_has_i2c0",
                     "soc_has_i2s0",
+                    "soc_has_ieee802154",
                     "soc_has_interrupt_core0",
                     "soc_has_intpri",
                     "soc_has_io_mux",
@@ -1786,6 +1787,7 @@ impl Chip {
                     "ecc_driver_supported",
                     "gpio_driver_supported",
                     "i2c_master_driver_supported",
+                    "ieee802154_driver_supported",
                     "interrupts_driver_supported",
                     "io_mux_driver_supported",
                     "lp_i2c_master_driver_supported",
@@ -1945,6 +1947,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_i2c_ana_mst",
                     "cargo:rustc-cfg=soc_has_i2c0",
                     "cargo:rustc-cfg=soc_has_i2s0",
+                    "cargo:rustc-cfg=soc_has_ieee802154",
                     "cargo:rustc-cfg=soc_has_interrupt_core0",
                     "cargo:rustc-cfg=soc_has_intpri",
                     "cargo:rustc-cfg=soc_has_io_mux",
@@ -2015,6 +2018,7 @@ impl Chip {
                     "cargo:rustc-cfg=ecc_driver_supported",
                     "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=i2c_master_driver_supported",
+                    "cargo:rustc-cfg=ieee802154_driver_supported",
                     "cargo:rustc-cfg=interrupts_driver_supported",
                     "cargo:rustc-cfg=io_mux_driver_supported",
                     "cargo:rustc-cfg=lp_i2c_master_driver_supported",
@@ -5192,6 +5196,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_hp_apm)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_hp_sys)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_huk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_ieee802154)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_intpri)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_keymng)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_ana)");
@@ -5224,6 +5229,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem6)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem7)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem8)");
+    println!("cargo:rustc-check-cfg=cfg(ieee802154_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(parl_io_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(dma_separate_in_out_interrupts)");
@@ -5256,7 +5262,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(wifi_has_5g)");
     println!("cargo:rustc-check-cfg=cfg(esp32c6)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_atomic)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_ieee802154)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_apm)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_i2c0)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_io)");
@@ -5267,7 +5272,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(lp_core)");
     println!("cargo:rustc-check-cfg=cfg(pm_support_beacon_wakeup)");
     println!("cargo:rustc-check-cfg=cfg(etm_driver_supported)");
-    println!("cargo:rustc-check-cfg=cfg(ieee802154_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(ulp_riscv_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(ecc_zero_extend_writes)");

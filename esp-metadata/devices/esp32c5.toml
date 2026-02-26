@@ -37,7 +37,7 @@ peripherals = [
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true },
     { name = "I2S0", interrupts = { peri = "I2S0" }, dma_peripheral = 3 },
-    # { name = "IEEE802154", interrupts = { mac = "ZB_MAC" } },
+    { name = "IEEE802154", interrupts = { mac = "ZB_MAC" } },
     { name = "INTERRUPT_CORE0" },
     { name = "INTPRI" },
     { name = "IO_MUX" },
@@ -631,7 +631,6 @@ support_status = "partial"
 controller = "npl"
 
 [device.ieee802154]
-support_status = "not_supported"
 
 [device.phy]
 support_status = "partial"

@@ -1,8 +1,7 @@
 use crate::peripherals::{MODEM_LPCON, MODEM_SYSCON};
 
-// done
 #[allow(unused)]
-pub(super) fn enable_phy(_en: bool) {
+pub(super) fn enable_phy(en: bool) {
     MODEM_SYSCON::regs()
         .clk_conf_power_st()
         .modify(|_, w| unsafe {
@@ -25,15 +24,15 @@ pub(super) fn enable_phy(_en: bool) {
 
     MODEM_LPCON::regs()
         .clk_conf()
-        .modify(|_, w| w.clk_coex_en().set_bit());
+        .modify(|_, w| w.clk_coex_en().bit(en));
 
     MODEM_SYSCON::regs().clk_conf1().modify(|_, w| {
-        w.clk_wifi_apb_en().set_bit();
-        w.clk_wifibb_22m_en().set_bit();
-        w.clk_fe_40m_en().set_bit();
-        w.clk_fe_80m_en().set_bit();
-        w.clk_wifibb_44m_en().set_bit();
-        w.clk_wifimac_en().set_bit()
+        w.clk_wifi_apb_en().bit(en);
+        w.clk_wifibb_22m_en().bit(en);
+        w.clk_fe_40m_en().bit(en);
+        w.clk_fe_80m_en().bit(en);
+        w.clk_wifibb_44m_en().bit(en);
+        w.clk_wifimac_en().bit(en)
     });
 
     MODEM_SYSCON::regs()
@@ -41,30 +40,51 @@ pub(super) fn enable_phy(_en: bool) {
         .modify(|r, w| unsafe { w.bits(r.bits() | 0x1fb) });
 
     MODEM_SYSCON::regs().clk_conf1().modify(|_, w| {
-        w.clk_fe_apb_en().set_bit();
-        w.clk_fe_80m_en().set_bit();
-        w.clk_fe_160m_en().set_bit();
-        w.clk_fe_dac_en().set_bit();
-        w.clk_fe_pwdet_adc_en().set_bit();
-        w.clk_fe_adc_en().set_bit()
+        w.clk_fe_apb_en().bit(en);
+        w.clk_fe_80m_en().bit(en);
+        w.clk_fe_160m_en().bit(en);
+        w.clk_fe_dac_en().bit(en);
+        w.clk_fe_pwdet_adc_en().bit(en);
+        w.clk_fe_adc_en().bit(en)
     });
 }
 
 #[allow(unused)]
 pub(super) fn enable_wifi(en: bool) {
     MODEM_SYSCON::regs().clk_conf1().modify(|_, w| {
-        w.clk_wifi_apb_en().set_bit();
-        w.clk_wifibb_44m_en().set_bit();
-        w.clk_wifimac_en().set_bit();
-        w.clk_fe_apb_en().set_bit();
-        w.clk_fe_80m_en().set_bit();
-        w.clk_fe_160m_en().set_bit()
+        w.clk_wifi_apb_en().bit(en);
+        w.clk_wifibb_44m_en().bit(en);
+        w.clk_wifimac_en().bit(en);
+        w.clk_fe_apb_en().bit(en);
+        w.clk_fe_80m_en().bit(en);
+        w.clk_fe_160m_en().bit(en)
     });
 }
 
 #[allow(unused)]
 pub(super) fn enable_ieee802154(en: bool) {
-    todo!()
+    MODEM_SYSCON::regs().clk_conf().modify(|r, w| {
+        w.clk_etm_en().bit(en);
+        w.clk_zb_apb_en().bit(en);
+        w.clk_zbmac_en().bit(en);
+        w.clk_modem_sec_en().bit(en);
+        w.clk_modem_sec_ecb_en().bit(en);
+        w.clk_modem_sec_ccm_en().bit(en);
+        w.clk_modem_sec_bah_en().bit(en);
+        w.clk_modem_sec_apb_en().bit(en);
+        w.clk_ble_timer_en().bit(en)
+    });
+
+    MODEM_SYSCON::regs().clk_conf1().modify(|_, w| {
+        w.clk_fe_apb_en().bit(en);
+        w.clk_bt_apb_en().bit(en);
+        w.clk_btbb_en().bit(en);
+        w.clk_btmac_en().bit(en);
+        w.clk_fe_20m_en().bit(en);
+        w.clk_fe_40m_en().bit(en);
+        w.clk_fe_80m_en().bit(en);
+        w.clk_fe_160m_en().bit(en)
+    });
 }
 
 #[allow(unused)]
@@ -80,14 +100,14 @@ pub(super) fn enable_bt(en: bool) {
     });
 
     MODEM_SYSCON::regs().clk_conf1().modify(|_, w| {
-        w.clk_fe_apb_en().set_bit();
-        w.clk_bt_apb_en().set_bit();
-        w.clk_btbb_en().set_bit();
-        w.clk_btmac_en().set_bit();
-        w.clk_fe_20m_en().set_bit();
-        w.clk_fe_40m_en().set_bit();
-        w.clk_fe_80m_en().set_bit();
-        w.clk_fe_160m_en().set_bit()
+        w.clk_fe_apb_en().bit(en);
+        w.clk_bt_apb_en().bit(en);
+        w.clk_btbb_en().bit(en);
+        w.clk_btmac_en().bit(en);
+        w.clk_fe_20m_en().bit(en);
+        w.clk_fe_40m_en().bit(en);
+        w.clk_fe_80m_en().bit(en);
+        w.clk_fe_160m_en().bit(en)
     });
 }
 
