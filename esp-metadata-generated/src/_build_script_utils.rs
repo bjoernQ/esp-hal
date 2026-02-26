@@ -840,7 +840,8 @@ impl Chip {
                     "dma_max_priority_is_set",
                     "dma_gdma_version=\"1\"",
                     "dma_gdma_version_is_set",
-                    "ecc_working_modes=\"7\"",
+                    "ecc_zero_extend_writes",
+                    "ecc_has_finite_field_division",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"31\"",
                     "gpio_constant_1_input=\"30\"",
@@ -996,7 +997,8 @@ impl Chip {
                     "cargo:rustc-cfg=dma_max_priority_is_set",
                     "cargo:rustc-cfg=dma_gdma_version=\"1\"",
                     "cargo:rustc-cfg=dma_gdma_version_is_set",
-                    "cargo:rustc-cfg=ecc_working_modes=\"7\"",
+                    "cargo:rustc-cfg=ecc_zero_extend_writes",
+                    "cargo:rustc-cfg=ecc_has_finite_field_division",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"31\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"30\"",
@@ -1832,7 +1834,9 @@ impl Chip {
                     "dma_max_priority_is_set",
                     "dma_gdma_version=\"2\"",
                     "dma_gdma_version_is_set",
-                    "ecc_working_modes=\"11\"",
+                    "ecc_separate_jacobian_point_memory",
+                    "ecc_has_modular_arithmetic",
+                    "ecc_has_point_addition",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"96\"",
                     "gpio_constant_1_input=\"64\"",
@@ -2063,7 +2067,9 @@ impl Chip {
                     "cargo:rustc-cfg=dma_max_priority_is_set",
                     "cargo:rustc-cfg=dma_gdma_version=\"2\"",
                     "cargo:rustc-cfg=dma_gdma_version_is_set",
-                    "cargo:rustc-cfg=ecc_working_modes=\"11\"",
+                    "cargo:rustc-cfg=ecc_separate_jacobian_point_memory",
+                    "cargo:rustc-cfg=ecc_has_modular_arithmetic",
+                    "cargo:rustc-cfg=ecc_has_point_addition",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"96\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"64\"",
@@ -2433,7 +2439,6 @@ impl Chip {
                     "dma_max_priority_is_set",
                     "dma_gdma_version=\"1\"",
                     "dma_gdma_version_is_set",
-                    "ecc_working_modes=\"8\"",
                     "ecc_zero_extend_writes",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"60\"",
@@ -2708,7 +2713,6 @@ impl Chip {
                     "cargo:rustc-cfg=dma_max_priority_is_set",
                     "cargo:rustc-cfg=dma_gdma_version=\"1\"",
                     "cargo:rustc-cfg=dma_gdma_version_is_set",
-                    "cargo:rustc-cfg=ecc_working_modes=\"8\"",
                     "cargo:rustc-cfg=ecc_zero_extend_writes",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"60\"",
@@ -3106,8 +3110,10 @@ impl Chip {
                     "dma_max_priority_is_set",
                     "dma_gdma_version=\"1\"",
                     "dma_gdma_version_is_set",
-                    "ecc_working_modes=\"11\"",
                     "ecc_zero_extend_writes",
+                    "ecc_separate_jacobian_point_memory",
+                    "ecc_has_modular_arithmetic",
+                    "ecc_has_point_addition",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"60\"",
                     "gpio_constant_1_input=\"56\"",
@@ -3341,8 +3347,10 @@ impl Chip {
                     "cargo:rustc-cfg=dma_max_priority_is_set",
                     "cargo:rustc-cfg=dma_gdma_version=\"1\"",
                     "cargo:rustc-cfg=dma_gdma_version_is_set",
-                    "cargo:rustc-cfg=ecc_working_modes=\"11\"",
                     "cargo:rustc-cfg=ecc_zero_extend_writes",
+                    "cargo:rustc-cfg=ecc_separate_jacobian_point_memory",
+                    "cargo:rustc-cfg=ecc_has_modular_arithmetic",
+                    "cargo:rustc-cfg=ecc_has_point_addition",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"60\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"56\"",
@@ -5128,6 +5136,8 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(dma_supports_mem2mem)");
     println!("cargo:rustc-check-cfg=cfg(dma_max_priority_is_set)");
     println!("cargo:rustc-check-cfg=cfg(dma_gdma_version_is_set)");
+    println!("cargo:rustc-check-cfg=cfg(ecc_zero_extend_writes)");
+    println!("cargo:rustc-check-cfg=cfg(ecc_has_finite_field_division)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_fsm_timeouts)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_hw_bus_clear)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_bus_timeout_enable)");
@@ -5233,6 +5243,9 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(parl_io_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(dma_separate_in_out_interrupts)");
+    println!("cargo:rustc-check-cfg=cfg(ecc_separate_jacobian_point_memory)");
+    println!("cargo:rustc-check-cfg=cfg(ecc_has_modular_arithmetic)");
+    println!("cargo:rustc-check-cfg=cfg(ecc_has_point_addition)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_can_estimate_nack_reason)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_loop_auto_stop)");
@@ -5274,7 +5287,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(etm_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(ulp_riscv_driver_supported)");
-    println!("cargo:rustc-check-cfg=cfg(ecc_zero_extend_writes)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_soc_root_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpu_hs_div)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpu_ls_div)");
@@ -5366,7 +5378,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(wifi_mac_version, values(\"1\",\"3\",\"2\"))");
     println!("cargo:rustc-check-cfg=cfg(dma_max_priority, values(\"9\",\"5\"))");
     println!("cargo:rustc-check-cfg=cfg(dma_gdma_version, values(\"1\",\"2\"))");
-    println!("cargo:rustc-check-cfg=cfg(ecc_working_modes, values(\"7\",\"11\",\"8\"))");
     println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count, values(\"21\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");

@@ -84,14 +84,11 @@ macro_rules! property {
     ("dma.gdma_version", str) => {
         stringify!(2)
     };
-    ("ecc.working_modes") => {
-        11
-    };
-    ("ecc.working_modes", str) => {
-        stringify!(11)
-    };
     ("ecc.zero_extend_writes") => {
         false
+    };
+    ("ecc.separate_jacobian_point_memory") => {
+        true
     };
     ("gpio.has_bank_1") => {
         false
@@ -385,6 +382,31 @@ macro_rules! for_each_dedicated_gpio {
         (7))); _for_each_inner_dedicated_gpio!((signals(0, 0, CPU_GPIO_0), (0, 1,
         CPU_GPIO_1), (0, 2, CPU_GPIO_2), (0, 3, CPU_GPIO_3), (0, 4, CPU_GPIO_4), (0, 5,
         CPU_GPIO_5), (0, 6, CPU_GPIO_6), (0, 7, CPU_GPIO_7)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_ecc_working_mode {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_ecc_working_mode { $(($pattern) => $code;)* ($other
+        : tt) => {} } _for_each_inner_ecc_working_mode!((0, AffinePointMultiplication));
+        _for_each_inner_ecc_working_mode!((2, AffinePointVerification));
+        _for_each_inner_ecc_working_mode!((3, AffinePointVerificationAndMultiplication));
+        _for_each_inner_ecc_working_mode!((4, JacobianPointMultiplication));
+        _for_each_inner_ecc_working_mode!((5, AffinePointAddition));
+        _for_each_inner_ecc_working_mode!((6, JacobianPointVerification));
+        _for_each_inner_ecc_working_mode!((7,
+        AffinePointVerificationAndJacobianPointMultiplication));
+        _for_each_inner_ecc_working_mode!((8, ModularAddition));
+        _for_each_inner_ecc_working_mode!((9, ModularSubtraction));
+        _for_each_inner_ecc_working_mode!((10, ModularMultiplication));
+        _for_each_inner_ecc_working_mode!((11, ModularDivision));
+        _for_each_inner_ecc_working_mode!((all(0, AffinePointMultiplication), (2,
+        AffinePointVerification), (3, AffinePointVerificationAndMultiplication), (4,
+        JacobianPointMultiplication), (5, AffinePointAddition), (6,
+        JacobianPointVerification), (7,
+        AffinePointVerificationAndJacobianPointMultiplication), (8, ModularAddition), (9,
+        ModularSubtraction), (10, ModularMultiplication), (11, ModularDivision)));
     };
 }
 #[macro_export]
