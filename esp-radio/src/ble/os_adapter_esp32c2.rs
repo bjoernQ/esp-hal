@@ -3,7 +3,7 @@ use procmacros::BuilderLite;
 use super::*;
 use crate::{
     ble::InvalidConfigError,
-    hal::{clock::Clocks, efuse::Efuse, interrupt, peripherals::BT},
+    hal::{efuse::Efuse, interrupt, peripherals::BT},
     interrupt_dispatch::Handler,
     sys::include::esp_bt_controller_config_t,
 };

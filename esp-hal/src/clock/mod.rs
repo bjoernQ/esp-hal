@@ -458,6 +458,16 @@ impl Clocks {
     }
 }
 
+/// The CPU clock frequency.
+pub fn cpu_clock() -> Rate {
+    Clocks::get().cpu_clock
+}
+
+/// The XTAL clock frequency.
+pub fn xtal_clock() -> Rate {
+    Clocks::get().xtal_clock
+}
+
 #[cfg(any(
     soc_has_bt,
     all(feature = "unstable", soc_has_ieee802154),
@@ -647,14 +657,4 @@ pub(crate) fn cycles_to_1ms() -> u16 {
     let period = (100_000_000 * period_13q19 as u64) / (1 << RtcClock::CAL_FRACT);
 
     (100_000_000 * 1000 / period) as u16
-}
-
-/// The CPU clock frequency.
-pub fn cpu_clock() -> Rate {
-    Clocks::get().cpu_clock
-}
-
-/// The XTAL clock frequency.
-pub fn xtal_clock_mhz() -> Rate {
-    Clocks::get().xtal_clock
 }
