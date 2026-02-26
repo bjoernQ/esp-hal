@@ -310,13 +310,12 @@ pub(crate) fn init() {
     }
 
     // A minimum clock of 80MHz is required to operate Wi-Fi module.
-    const MIN_CLOCK: Rate = Rate::from_mhz(80);
-    let clocks = Clocks::get();
-    if clocks.cpu_clock < MIN_CLOCK {
+    const MIN_CLOCK: u32 = 80;
+    let cpu_clock = esp_hal::clock::cpu_clock_mhz();
+    if cpu_clock < MIN_CLOCK {
         panic!(
             "CPU clock {} MHz is too slow for Wi-Fi operation, minimum required is {} MHz",
-            clocks.cpu_clock.as_mhz(),
-            MIN_CLOCK.as_mhz()
+            cpu_clock, MIN_CLOCK
         );
     }
 

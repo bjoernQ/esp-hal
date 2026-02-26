@@ -648,3 +648,15 @@ pub(crate) fn cycles_to_1ms() -> u16 {
 
     (100_000_000 * 1000 / period) as u16
 }
+
+/// This is virtually stable API used by esp-radio we need to keep.
+#[doc(hidden)]
+pub fn cpu_clock_mhz() -> u32 {
+    Clocks::get().cpu_clock.as_mhz()
+}
+
+/// This is virtually stable API used by esp-radio we need to keep.
+#[doc(hidden)]
+pub fn xtal_clock_mhz() -> u32 {
+    Clocks::get().xtal_clock.as_mhz()
+}
