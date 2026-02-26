@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic WiFi support for ESP32-C5 (#5003)
 - `set_band_mode` to support 5G-band (#5023)
 - BLE Support for ESP32-C5 (#5065)
+- IEEE 802.15.4 Support for ESP32-C5 (#5070)
 
 ### Changed
 
