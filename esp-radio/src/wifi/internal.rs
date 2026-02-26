@@ -11,7 +11,7 @@ use crate::{
 #[cfg(coex)]
 use crate::{hal::ram, sys::c_types::c_void};
 
-#[cfg(all(coex, any(esp32, esp32c2, esp32c3, esp32c6, esp32s3)))]
+#[cfg(all(coex, wifi_driver_supported, bt_driver_supported))]
 pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::sys::include::coex_adapter_funcs_t =
     crate::sys::include::coex_adapter_funcs_t {
         _version: crate::sys::include::COEX_ADAPTER_VERSION as i32,

@@ -1,7 +1,6 @@
 //% CHIPS(no_wifi): esp32h2
-//% CHIPS(no_ble): esp32s2 esp32c5
-//% CHIPS(no_radio): esp32c5
-//% CHIPS(has_wifi_ble): esp32 esp32c2 esp32c3 esp32c6 esp32s3
+//% CHIPS(no_ble): esp32s2
+//% CHIPS(has_wifi_ble): esp32 esp32c2 esp32c3 esp32c6 esp32s3 esp32c5
 
 //% FEATURES: unstable esp-alloc embassy
 //% FEATURES(no_radio): rtos-radio-driver
