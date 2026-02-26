@@ -261,7 +261,7 @@ impl Config {
 }
 
 pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
-    let main_xtal_freq = esp_hal::clock::xtal_clock_mhz() as u8;
+    let main_xtal_freq = esp_hal::clock::xtal_clock().as_mhz() as u8;
 
     let rtc_freq = if main_xtal_freq == 26 { 40000 } else { 32000 };
 
