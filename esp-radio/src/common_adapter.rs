@@ -319,27 +319,24 @@ pub(crate) unsafe fn phy_disable_clock() {
 pub(crate) fn enable_wifi_power_domain() {
     #[cfg(not(any(soc_has_pmu, esp32c2)))]
     {
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_lpwr)] {
-                let rtc_cntl = esp_hal::peripherals::LPWR::regs();
-            } else {
-                let rtc_cntl = esp_hal::peripherals::RTC_CNTL::regs();
-            }
-        }
+        // C5, C6 have `LP_CLKRST`, but they're cfg'd out with `not(soc_has_pmu)`
+        // TODO: revisit this code (https://github.com/esp-rs/esp-hal/pull/5066#discussion_r2858978902)
+        let rtc_cntl = regs!(RTC_CNTL);
 
         rtc_cntl
             .dig_pwc()
             .modify(|_, w| w.wifi_force_pd().clear_bit());
 
         #[cfg(not(esp32))]
-        unsafe {
-            cfg_if::cfg_if! {
-                if #[cfg(soc_has_apb_ctrl)] {
-                    let syscon = esp_hal::peripherals::APB_CTRL::regs();
-                } else {
-                    let syscon = esp_hal::peripherals::SYSCON::regs();
-                }
+        cfg_if::cfg_if! {
+            if #[cfg(soc_has_apb_ctrl)] {
+                let syscon = regs!(APB_CTRL);
+            } else { // S2
+                let syscon = regs!(SYSCON);
             }
+        }
+        #[cfg(not(esp32))]
+        unsafe {
             const WIFIBB_RST: u32 = 1 << 0; // Wi-Fi baseband
             const FE_RST: u32 = 1 << 1; // RF Frontend RST
             const WIFIMAC_RST: u32 = 1 << 2; // Wi-Fi MAC

@@ -170,6 +170,7 @@ extern crate alloc;
 
 // MUST be the first module
 mod fmt;
+pub(crate) mod reg_access;
 
 use esp_hal as hal;
 #[cfg(feature = "unstable")]
