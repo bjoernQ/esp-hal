@@ -107,36 +107,49 @@ impl ClockConfig {
     }
 
     pub(crate) fn configure(mut self) {
-        // Detect XTAL if unset.
-        // FIXME: this doesn't support running from RC_FAST_CLK. We should rework detection to only
-        // run when requesting XTAL.
+        // Switch CPU to XTAL before reconfiguring PLL. The bootloader may have left the CPU
+        // running on PLL, and changing PLL parameters while it is the active clock source would
+        // cause instability.
         ClockTree::with(|clocks| {
-            if self.xtal_clk.is_none() {
-                let xtal = detect_xtal_freq(clocks);
-                debug!("Auto-detected XTAL frequency: {}", xtal.value());
-                self.xtal_clk = Some(xtal);
-            }
+            configure_xtal_clk(clocks, XtalClkConfig::_40);
+            configure_syscon_pre_div(clocks, SysconPreDivConfig::new(0));
+            configure_cpu_clk(clocks, CpuClkConfig::Xtal);
         });
+
+        // Detect XTAL if unset.
+        // FIXME: this doesn't support running from RC_FAST_CLK. We should rework detection to
+        // only run when requesting XTAL.
+        if self.xtal_clk.is_none() {
+            let xtal = ClockTree::with(detect_xtal_freq);
+            debug!("Auto-detected XTAL frequency: {}", xtal.value());
+            self.xtal_clk = Some(xtal);
+        }
 
         self.apply();
     }
 }
 
 fn detect_xtal_freq(clocks: &mut ClockTree) -> XtalClkConfig {
-    const SLOW_CLOCK_CYCLES: u32 = 100;
+    // Estimate XTAL frequency using RC_FAST/256 as the calibration clock. RC_SLOW is too
+    // imprecise for reliable detection.
+    const CALIBRATION_CYCLES: u32 = 10;
 
-    // Just an assumption for things to not panic.
-    configure_xtal_clk(clocks, XtalClkConfig::_40);
-    configure_syscon_pre_div(clocks, SysconPreDivConfig::new(0));
-    configure_cpu_clk(clocks, CpuClkConfig::Xtal);
+    // The digital path for RC_FAST_D256 must be enabled for TIMG calibration to work.
+    LPWR::regs()
+        .clk_conf()
+        .modify(|_, w| w.dig_clk8m_d256_en().set_bit());
 
     let (xtal_cycles, calibration_clock_frequency) = Clocks::measure_rtc_clock(
         clocks,
-        Timg0CalibrationClockConfig::RcSlowClk,
-        SLOW_CLOCK_CYCLES,
+        Timg0CalibrationClockConfig::RcFastDivClk,
+        CALIBRATION_CYCLES,
     );
 
-    let mhz = (calibration_clock_frequency * xtal_cycles / SLOW_CLOCK_CYCLES).as_mhz();
+    LPWR::regs()
+        .clk_conf()
+        .modify(|_, w| w.dig_clk8m_d256_en().clear_bit());
+
+    let mhz = (calibration_clock_frequency * xtal_cycles / CALIBRATION_CYCLES).as_mhz();
 
     if mhz.abs_diff(40) < mhz.abs_diff(26) {
         XtalClkConfig::_40
@@ -197,16 +210,22 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
         return;
     }
 
+    // Reset BBPLL calibration configuration.
+    regi2c::I2C_BBPLL_IR_CAL_DELAY.write_reg(BBPLL_IR_CAL_DELAY_VAL);
+    regi2c::I2C_BBPLL_IR_CAL_EXT_CAP.write_reg(BBPLL_IR_CAL_EXT_CAP_VAL);
+    regi2c::I2C_BBPLL_OC_ENB_FCAL.write_reg(BBPLL_OC_ENB_FCAL_VAL);
+    regi2c::I2C_BBPLL_OC_ENB_VCON.write_reg(BBPLL_OC_ENB_VCON_VAL);
+    regi2c::I2C_BBPLL_BBADC_CAL_REG.write_reg(BBPLL_BBADC_CAL_7_0_VAL);
+
     let xtal_cfg = unwrap!(clocks.xtal_clk);
     let pll_cfg = unwrap!(clocks.pll_clk);
 
-    // This classification is arbitrary based on variable names and what (PLL output or XTAL input)
-    // affects the values.
+    // This classification is arbitrary based on variable names and what (PLL output or XTAL
+    // input) affects the values.
     struct PllParams {
-        // The only parameter I could infer, it divides the reference clock (XTAL).
-        // We'll either use a reference of 40MHz or 2MHz (or maybe 20/1MHz).
-        // The rest of the parameters somehow ensure this divided reference clock is multiplied to
-        // the PLL target frequency.
+        // The only parameter I could infer, it divides the reference clock (XTAL). We'll either
+        // use a reference of 40MHz or 2MHz (or maybe 20/1MHz). The rest of the parameters
+        // somehow ensure this divided reference clock is multiplied to the PLL target frequency.
         div_ref: u8,
         div10_8: u8,
         lref: u8,
@@ -223,7 +242,6 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
         }
     }
 
-    // maybe?
     struct VoltageParams {
         endiv5: u8,
         bbadc_dsmp: u8,
@@ -279,11 +297,16 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
         },
     };
 
+    // Apply voltage first, then PLL params. For 480MHz, the higher voltage needs time to
+    // stabilize before configuring PLL parameters.
     voltage_params.apply();
+    if matches!(pll_cfg, PllClkConfig::_480) {
+        ets_delay_us(3);
+    }
     pll_params.apply();
 
-    // Unclear why in esp-idf this depends on the source of RTC_SLOW_CLK. Let's just assume the
-    // slowest option.
+    // Wait for PLL to lock. Use the slower of the two possible wait times (80us for RC_SLOW,
+    // 160us for 32K XTAL).
     const SOC_DELAY_PLL_ENABLE_WITH_32K: u32 = 160;
     ets_delay_us(SOC_DELAY_PLL_ENABLE_WITH_32K);
 }
@@ -583,7 +606,8 @@ fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
 fn enable_rc_fast_div_clk_impl(_clocks: &mut ClockTree, en: bool) {
     LPWR::regs().clk_conf().modify(|_, w| {
-        w.enb_ck8m_div().bit(en);
+        // Active-low: clear to enable, set to disable.
+        w.enb_ck8m_div().bit(!en);
         w.ck8m_div().div256()
     });
 }

@@ -91,40 +91,51 @@ impl ClockConfig {
     }
 
     pub(crate) fn configure(mut self) {
-        // Detect XTAL if unset.
-        // FIXME: this doesn't support running from RC_FAST_CLK. We should rework detection to only
-        // run when requesting XTAL.
+        // Switch CPU to XTAL before reconfiguring PLL.
         ClockTree::with(|clocks| {
-            if self.xtal_clk.is_none() {
-                // While the bootloader stores a crystal frequency in a retention register,
-                // that comes from a constant that we should not trust. If the user did not
-                // provide a crystal frequency, we should detect it.
-                let xtal = detect_xtal_freq(clocks);
-                debug!("Auto-detected XTAL frequency: {}", xtal.value());
-                self.xtal_clk = Some(xtal);
-            }
+            configure_xtal_clk(clocks, XtalClkConfig::_40);
+            configure_system_pre_div(clocks, SystemPreDivConfig::new(0));
+            configure_cpu_clk(clocks, CpuClkConfig::Xtal);
         });
+
+        // Detect XTAL if unset.
+        // FIXME: this doesn't support running from RC_FAST_CLK. We should rework detection to
+        // only run when requesting XTAL.
+        if self.xtal_clk.is_none() {
+            // While the bootloader stores a crystal frequency in a retention register,
+            // that comes from a constant that we should not trust. If the user did not
+            // provide a crystal frequency, we should detect it.
+            let xtal = ClockTree::with(detect_xtal_freq);
+            debug!("Auto-detected XTAL frequency: {}", xtal.value());
+            self.xtal_clk = Some(xtal);
+        }
 
         self.apply();
     }
 }
 
 fn detect_xtal_freq(clocks: &mut ClockTree) -> XtalClkConfig {
-    const SLOW_CLOCK_CYCLES: u32 = 100;
+    // Estimate XTAL frequency using RC_FAST/256 as the calibration clock. RC_SLOW is too
+    // imprecise for reliable detection.
+    const CALIBRATION_CYCLES: u32 = 10;
 
-    // Just an assumption for things to not panic.
-    configure_xtal_clk(clocks, XtalClkConfig::_40);
-    configure_system_pre_div(clocks, SystemPreDivConfig::new(0));
-    configure_cpu_clk(clocks, CpuClkConfig::Xtal);
+    // The digital path for RC_FAST_D256 must be enabled for TIMG calibration to work.
+    LPWR::regs()
+        .clk_conf()
+        .modify(|_, w| w.dig_clk8m_d256_en().set_bit());
 
     let (xtal_cycles, calibration_clock_frequency) = Clocks::measure_rtc_clock(
         clocks,
-        Timg0CalibrationClockConfig::RcSlowClk,
+        Timg0CalibrationClockConfig::RcFastDivClk,
         Timg0FunctionClockConfig::XtalClk,
-        SLOW_CLOCK_CYCLES,
+        CALIBRATION_CYCLES,
     );
 
-    let mhz = (calibration_clock_frequency * xtal_cycles / SLOW_CLOCK_CYCLES).as_mhz();
+    LPWR::regs()
+        .clk_conf()
+        .modify(|_, w| w.dig_clk8m_d256_en().clear_bit());
+
+    let mhz = (calibration_clock_frequency * xtal_cycles / CALIBRATION_CYCLES).as_mhz();
 
     if mhz.abs_diff(40) < mhz.abs_diff(26) {
         XtalClkConfig::_40

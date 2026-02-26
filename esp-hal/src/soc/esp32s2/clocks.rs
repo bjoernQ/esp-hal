@@ -109,6 +109,13 @@ impl ClockConfig {
             self.xtal_clk = Some(XtalClkConfig::_40);
         }
 
+        // Switch CPU to XTAL before reconfiguring PLL.
+        ClockTree::with(|clocks| {
+            configure_xtal_clk(clocks, XtalClkConfig::_40);
+            configure_system_pre_div(clocks, SystemPreDivConfig::new(0));
+            configure_cpu_clk(clocks, CpuClkConfig::Xtal);
+        });
+
         self.apply();
     }
 }
@@ -520,7 +527,8 @@ fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
 fn enable_rc_fast_div_clk_impl(_clocks: &mut ClockTree, en: bool) {
     LPWR::regs().clk_conf().modify(|_, w| {
-        w.enb_ck8m_div().bit(en);
+        // Active-low: clear to enable, set to disable.
+        w.enb_ck8m_div().bit(!en);
         unsafe { w.ck8m_div().bits(1) } // divide by 256
     });
 }

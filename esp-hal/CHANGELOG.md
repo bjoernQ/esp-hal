@@ -88,6 +88,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S2: Fixed an issue where enabling TRNG can prevent WiFi from working (#4856)
 - Fixed an issue that caused the stack guard to overwrite data moved to the second core (#4914)
 - PCNT: Fixed some potential data race issues (#4932)
+- Fixed PLL reconfiguration causing garbled serial output (#5067)
+- ESP32, ESP32-S2: Fixed RC_FAST divider enable polarity (#5067)
 
 ### Removed
 

@@ -113,6 +113,13 @@ impl ClockConfig {
             self.xtal_clk = Some(XtalClkConfig::_40);
         }
 
+        // Switch CPU to XTAL before reconfiguring PLL.
+        ClockTree::with(|clocks| {
+            configure_xtal_clk(clocks, XtalClkConfig::_40);
+            configure_system_pre_div(clocks, SystemPreDivConfig::new(0));
+            configure_cpu_clk(clocks, CpuClkConfig::Xtal);
+        });
+
         self.apply();
     }
 }
