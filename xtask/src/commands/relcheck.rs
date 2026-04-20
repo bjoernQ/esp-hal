@@ -116,50 +116,66 @@ fn deinit_rel_check() -> Result<()> {
 }
 
 fn init_rel_check() -> Result<()> {
+    fn prepare_for_directory(project: &Path) -> Result<()> {
+        log::info!("Processing {}", project.display());
+
+        let _ = std::fs::remove_file(project.join("Cargo.lock"));
+
+        // make sure we have the `Cargo.lock` file
+        let status = std::process::Command::new("cargo")
+            .arg(format!("+{}", toolchain()))
+            .arg("metadata")
+            .arg("--format-version=1")
+            .current_dir(&project)
+            .stdout(std::process::Stdio::null())
+            .status()?;
+
+        if !status.success() {
+            log::warn!("Failed");
+        }
+
+        // add all dependencies referenced by the lock file
+        let mut cmd = std::process::Command::new("cargo");
+        cmd.arg("local-registry");
+        cmd.arg("--no-delete");
+        cmd.arg("--sync");
+        cmd.arg("Cargo.lock");
+        cmd.arg(windows_safe_path(
+            &std::path::PathBuf::from("target/local-registry")
+                .canonicalize()
+                .unwrap(),
+        ));
+        cmd.stdout(std::process::Stdio::null());
+        cmd.env_clear();
+        cmd.envs(
+            std::env::vars()
+                .into_iter()
+                .filter(|(k, _)| !k.starts_with("CARGO")),
+        );
+        cmd.current_dir(&project);
+
+        log::info!("{:?}", cmd);
+        cmd.status()?;
+        Ok(())
+    }
+
     // cleanup
     if std::fs::exists("target/local-registry")? {
         std::fs::remove_dir_all("target/local-registry")?;
     }
     std::fs::create_dir("target/local-registry")?;
 
-    // make sure we have the `Cargo.lock` file
-    let project = Path::new("init-local-registry");
-    let _ = std::fs::remove_file(project.join("Cargo.lock"));
+    // prepare latest released versions
+    prepare_for_directory(Path::new("init-local-registry"))?;
 
-    let status = std::process::Command::new("cargo")
-        .arg(format!("+{}", toolchain()))
-        .arg("metadata")
-        .arg("--format-version=1")
-        .current_dir(&project)
-        .stdout(std::process::Stdio::null())
-        .status()?;
-
-    if !status.success() {
-        log::warn!("Failed");
+    // prepare versions from compile-tests - might not be latest released
+    for dir in std::fs::read_dir("compile-tests")? {
+        if let Ok(dir) = dir {
+            if dir.file_type()?.is_dir() {
+                prepare_for_directory(&dir.path())?;
+            }
+        }
     }
-
-    // add all dependencies referenced by the lock file
-    let mut cmd = std::process::Command::new("cargo");
-    cmd.arg("local-registry");
-    cmd.arg("--no-delete");
-    cmd.arg("--sync");
-    cmd.arg("Cargo.lock");
-    cmd.arg(windows_safe_path(
-        &std::path::PathBuf::from("target/local-registry")
-            .canonicalize()
-            .unwrap(),
-    ));
-    cmd.stdout(std::process::Stdio::null());
-    cmd.env_clear();
-    cmd.envs(
-        std::env::vars()
-            .into_iter()
-            .filter(|(k, _)| !k.starts_with("CARGO")),
-    );
-    cmd.current_dir(&project);
-
-    log::info!("{:?}", cmd);
-    cmd.status()?;
 
     // install dependencies needed for build-std
     let mut cmd = std::process::Command::new("cargo");
@@ -213,6 +229,28 @@ fn init_rel_check() -> Result<()> {
         toolchain_folder("stable")?.display()
     ));
     cmd.arg("target/local-registry");
+    cmd.stdout(std::process::Stdio::null());
+    cmd.env_clear();
+    cmd.envs(
+        std::env::vars()
+            .into_iter()
+            .filter(|(k, _)| !k.starts_with("CARGO")),
+    );
+
+    log::info!("{:?}", cmd);
+    cmd.status()?;
+
+    // and lastly do it for the xtask itself
+    let mut cmd = std::process::Command::new("cargo");
+    cmd.arg("local-registry");
+    cmd.arg("--no-delete");
+    cmd.arg("--sync");
+    cmd.arg("Cargo.lock");
+    cmd.arg(windows_safe_path(
+        &std::path::PathBuf::from("target/local-registry")
+            .canonicalize()
+            .unwrap(),
+    ));
     cmd.stdout(std::process::Stdio::null());
     cmd.env_clear();
     cmd.envs(
