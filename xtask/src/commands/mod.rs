@@ -242,15 +242,6 @@ impl ExamplesPackage {
             _ => false,
         }
     }
-
-    fn folder_name(&self) -> String {
-        match self {
-            ExamplesPackage::Examples => "examples".to_string(),
-            ExamplesPackage::QaTest => "qa-test".to_string(),
-            ExamplesPackage::EspLpHal => "esp-lp-hal".to_string(),
-            ExamplesPackage::CompileTests => "compile-tests".to_string(),
-        }
-    }
 }
 
 /// Arguments common to commands which act on doctests.
@@ -355,7 +346,7 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     } else {
         let example_path = match args.package.as_package() {
             Package::QaTest => package_path.join("src").join("bin"),
-            _ => package_path.join(args.package.folder_name()),
+            _ => package_path.join("examples"),
         };
 
         crate::firmware::load(&example_path)?
