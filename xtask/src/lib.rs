@@ -232,7 +232,7 @@ impl Package {
     /// Should documentation be built for the package, and should the package be
     /// published?
     pub fn is_published(&self) -> bool {
-        if *self == Package::Examples {
+        if *self == Package::Examples || *self == Package::CompileTests {
             // The `examples/` directory does not contain `Cargo.toml` in its root, and even if it
             // did nothing in this directory will be published.
             false
