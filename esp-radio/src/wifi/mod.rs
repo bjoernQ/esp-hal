@@ -81,6 +81,7 @@ use self::{
 };
 use crate::{
     RadioRefGuard,
+    asynch::AtomicWaker,
     hal::ram,
     sys::{
         c_types,
@@ -1837,12 +1838,10 @@ pub(crate) use esp_wifi_result;
 
 // We can get away with a single tx waker because the transmit queue is shared
 // between interfaces.
-pub(crate) static TRANSMIT_WAKER: crate::asynch::AtomicWaker = crate::asynch::AtomicWaker::new();
+static TRANSMIT_WAKER: AtomicWaker = AtomicWaker::new();
 
-pub(crate) static AP_LINK_STATE_WAKER: crate::asynch::AtomicWaker =
-    crate::asynch::AtomicWaker::new();
-pub(crate) static STA_LINK_STATE_WAKER: crate::asynch::AtomicWaker =
-    crate::asynch::AtomicWaker::new();
+static AP_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
+static STA_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
 
 // we implement up to three latest versions of the embassy-net-driver
 // (but 0.1 clashes with embassy-time-driver)
