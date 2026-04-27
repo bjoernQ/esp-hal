@@ -110,6 +110,17 @@ mod internal;
 
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
 
+/// The link state of a network device.
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum LinkState {
+    /// The link is down.
+    #[default]
+    Down,
+    /// The link is up.
+    Up,
+}
+
 /// Supported Wi-Fi authentication methods.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1123,7 +1134,7 @@ unsafe extern "C" fn esp_wifi_tx_done_cb(
 
     decrement_inflight_counter();
 
-    embassy::TRANSMIT_WAKER.wake();
+    TRANSMIT_WAKER.wake();
 }
 
 pub(crate) fn wifi_start_scan(
@@ -1275,7 +1286,7 @@ impl InterfaceType {
 
         if self.can_send() {
             // even checking for !Uninitialized would be enough to not crash
-            if self.link_state() == embassy_net_driver::LinkState::Up {
+            if self.link_state() == LinkState::Up {
                 return Some(WifiTxToken { mode: *self });
             }
         }
@@ -1307,7 +1318,7 @@ impl InterfaceType {
     }
 
     fn register_transmit_waker(&self, cx: &mut core::task::Context<'_>) {
-        embassy::TRANSMIT_WAKER.register(cx.waker())
+        TRANSMIT_WAKER.register(cx.waker())
     }
 
     fn register_receive_waker(&self, cx: &mut core::task::Context<'_>) {
@@ -1316,12 +1327,12 @@ impl InterfaceType {
 
     fn register_link_state_waker(&self, cx: &mut core::task::Context<'_>) {
         match self {
-            InterfaceType::Station => embassy::STA_LINK_STATE_WAKER.register(cx.waker()),
-            InterfaceType::AccessPoint => embassy::AP_LINK_STATE_WAKER.register(cx.waker()),
+            InterfaceType::Station => STA_LINK_STATE_WAKER.register(cx.waker()),
+            InterfaceType::AccessPoint => AP_LINK_STATE_WAKER.register(cx.waker()),
         }
     }
 
-    fn link_state(&self) -> embassy_net_driver::LinkState {
+    fn link_state(&self) -> LinkState {
         let is_up = match self {
             InterfaceType::Station => {
                 matches!(station_state(), WifiStationState::Connected)
@@ -1332,9 +1343,9 @@ impl InterfaceType {
         };
 
         if is_up {
-            embassy_net_driver::LinkState::Up
+            LinkState::Up
         } else {
-            embassy_net_driver::LinkState::Down
+            LinkState::Down
         }
     }
 }
@@ -1820,18 +1831,20 @@ macro_rules! esp_wifi_result {
 }
 pub(crate) use esp_wifi_result;
 
-pub(crate) mod embassy {
-    use embassy_net_driver::{Capabilities, Driver, HardwareAddress, RxToken, TxToken};
+// We can get away with a single tx waker because the transmit queue is shared
+// between interfaces.
+pub(crate) static TRANSMIT_WAKER: crate::asynch::AtomicWaker = crate::asynch::AtomicWaker::new();
+
+pub(crate) static AP_LINK_STATE_WAKER: crate::asynch::AtomicWaker =
+    crate::asynch::AtomicWaker::new();
+pub(crate) static STA_LINK_STATE_WAKER: crate::asynch::AtomicWaker =
+    crate::asynch::AtomicWaker::new();
+
+// we implement the (max) latest three versions of the embassy-net-driver
+pub(crate) mod embassy_02 {
+    use embassy_net_driver_02::{Capabilities, Driver, HardwareAddress, RxToken, TxToken};
 
     use super::*;
-    use crate::asynch::AtomicWaker;
-
-    // We can get away with a single tx waker because the transmit queue is shared
-    // between interfaces.
-    pub(crate) static TRANSMIT_WAKER: AtomicWaker = AtomicWaker::new();
-
-    pub(crate) static AP_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
-    pub(crate) static STA_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
 
     impl RxToken for WifiRxToken {
         fn consume<R, F>(self, f: F) -> R
@@ -1878,9 +1891,12 @@ pub(crate) mod embassy {
         fn link_state(
             &mut self,
             cx: &mut core::task::Context<'_>,
-        ) -> embassy_net_driver::LinkState {
+        ) -> embassy_net_driver_02::LinkState {
             self.mode.register_link_state_waker(cx);
-            self.mode.link_state()
+            match self.mode.link_state() {
+                LinkState::Down => embassy_net_driver_02::LinkState::Down,
+                LinkState::Up => embassy_net_driver_02::LinkState::Up,
+            }
         }
 
         fn capabilities(&self) -> Capabilities {
