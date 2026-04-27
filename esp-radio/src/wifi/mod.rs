@@ -113,7 +113,7 @@ const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
 /// The link state of a network device.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum LinkState {
+enum LinkState {
     /// The link is down.
     #[default]
     Down,
@@ -1351,6 +1351,10 @@ impl InterfaceType {
 }
 
 /// Wi-Fi interface.
+///
+/// This implements the `embassy-net-driver` trait for up to three latest versions of that crate.
+/// While that crate isn't stable we make an exception here from the [API Guidelines](https://rust-lang.github.io/api-guidelines/necessities.html#c-stable)
+/// in exposing unstable dependencies.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
