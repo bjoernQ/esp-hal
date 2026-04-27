@@ -1840,9 +1840,17 @@ pub(crate) static AP_LINK_STATE_WAKER: crate::asynch::AtomicWaker =
 pub(crate) static STA_LINK_STATE_WAKER: crate::asynch::AtomicWaker =
     crate::asynch::AtomicWaker::new();
 
-// we implement the (max) latest three versions of the embassy-net-driver
+// we implement up to three latest versions of the embassy-net-driver
+// (but 0.1 clashes with embassy-time-driver)
 pub(crate) mod embassy_02 {
-    use embassy_net_driver_02::{Capabilities, Driver, HardwareAddress, RxToken, TxToken};
+    use embassy_net_driver_02::{
+        Capabilities,
+        Driver,
+        HardwareAddress,
+        LinkState,
+        RxToken,
+        TxToken,
+    };
 
     use super::*;
 
@@ -1888,14 +1896,11 @@ pub(crate) mod embassy_02 {
             self.mode.tx_token()
         }
 
-        fn link_state(
-            &mut self,
-            cx: &mut core::task::Context<'_>,
-        ) -> embassy_net_driver_02::LinkState {
+        fn link_state(&mut self, cx: &mut core::task::Context<'_>) -> LinkState {
             self.mode.register_link_state_waker(cx);
             match self.mode.link_state() {
-                LinkState::Down => embassy_net_driver_02::LinkState::Down,
-                LinkState::Up => embassy_net_driver_02::LinkState::Up,
+                super::LinkState::Down => LinkState::Down,
+                super::LinkState::Up => LinkState::Up,
             }
         }
 
