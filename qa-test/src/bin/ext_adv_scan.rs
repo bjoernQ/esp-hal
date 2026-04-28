@@ -7,7 +7,7 @@
 //! Enable advertising.
 
 //% FEATURES: esp-radio esp-radio/ble esp-hal/unstable
-//% CHIPS: esp32 esp32s3 esp32h2 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61
+//% CHIPS: esp32s3 esp32h2 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61
 
 #![no_std]
 #![no_main]
@@ -39,11 +39,7 @@ async fn main(_s: Spawner) {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let bluetooth = peripherals.BT;
-    let connector = BleConnector::new(
-        bluetooth,
-        esp_radio::ble::Config::default().with_ext_adv_max_size(1650),
-    )
-    .unwrap();
+    let connector = BleConnector::new(bluetooth, esp_radio::ble::Config::default()).unwrap();
     let controller: ExternalController<_, 1> = ExternalController::new(connector);
 
     // Using a fixed "random" address can be useful for testing. In real scenarios, one would
