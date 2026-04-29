@@ -5,6 +5,8 @@
 //! e.g. on Windows use `Bluetooth LE Explorer` - use `Advertisement Beacon`,
 //! make sure to enable "Use Extended Format" and some payload.
 //! Enable advertising.
+//!
+//! Not supported on ESP32 since this feature needs BLE 5.0+ (and ESP32 is 4.2)
 
 //% FEATURES: esp-radio esp-radio/ble esp-hal/unstable
 //% CHIPS: esp32s3 esp32h2 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61
