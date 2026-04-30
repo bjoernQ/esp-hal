@@ -112,10 +112,10 @@
 //!
 //! - Only TDM mode is supported.
 
+use core::mem::ManuallyDrop;
+
 use enumset::{EnumSet, EnumSetType};
 use private::*;
-
-use core::mem::ManuallyDrop;
 
 use crate::{
     Async,
@@ -123,20 +123,16 @@ use crate::{
     DriverMode,
     RegisterToggle,
     dma::{
-        DmaTxBuffer,
-        DmaRxBuffer,
         Channel,
         ChannelRx,
         ChannelTx,
-        DescriptorChain,
         DmaChannelFor,
         DmaEligible,
         DmaError,
+        DmaRxBuffer,
+        DmaTxBuffer,
         PeripheralRxChannel,
         PeripheralTxChannel,
-        ReadBuffer,
-        WriteBuffer,
-        dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
     },
     gpio::{OutputConfig, interconnect::PeripheralOutput},
     i2s::AnyI2s,
@@ -182,17 +178,37 @@ where
     dma_buf: ManuallyDrop<Buf>,
 }
 
-impl <'d, Dm, Buf> I2sTxDmaTransfer<'d, Dm, Buf>
+impl<'d, Dm, Buf> I2sTxDmaTransfer<'d, Dm, Buf>
 where
-    Dm: DriverMode {
+    Dm: DriverMode,
+{
+    /// Returns true when [Self::wait] will not block.
+    pub fn is_done(&self) -> bool {
+        self.i2s_tx.i2s.is_tx_done()
+    }
 
-        /// FOO
-        pub fn release(self) -> (I2sTx<'d, Dm>, Buf) {
-            unsafe {
-                (ManuallyDrop::into_inner(self.i2s_tx), ManuallyDrop::into_inner(self.dma_buf))
+    /// Waits for the transfer to finish and returns the peripheral and buffer.
+    pub fn wait(mut self) -> Result<(I2sTx<'d, Dm>, Buf), DmaError> {
+        while !self.is_done() {}
 
-            }
+        self.i2s_tx.tx_channel.stop_transfer();
+        self.i2s_tx.i2s.tx_stop();
+
+        let (i2s_tx, buf) = self.release();
+
+        if i2s_tx.tx_channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok((i2s_tx, buf))
         }
+    }
+
+    fn release(self) -> (I2sTx<'d, Dm>, Buf) {
+        (
+            ManuallyDrop::into_inner(self.i2s_tx),
+            ManuallyDrop::into_inner(self.dma_buf),
+        )
+    }
 }
 
 /// A structure representing a DMA transfer.
@@ -212,13 +228,33 @@ impl<'d, Dm, Buf> I2sRxDmaTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
 {
-            /// FOO
-        pub fn release(self) -> (I2sRx<'d, Dm>, Buf) {
-            unsafe {
-                (ManuallyDrop::into_inner(self.i2s_rx), ManuallyDrop::into_inner(self.dma_buf))
+    /// Returns true when [Self::wait] will not block.
+    pub fn is_done(&self) -> bool {
+        self.i2s_rx.i2s.is_rx_done()
+    }
 
-            }
+    /// Waits for the transfer to finish and returns the peripheral and buffer.
+    pub fn wait(mut self) -> Result<(I2sRx<'d, Dm>, Buf), DmaError> {
+        while !self.is_done() {}
+
+        self.i2s_rx.rx_channel.stop_transfer();
+        self.i2s_rx.i2s.rx_stop();
+
+        let (i2s_rx, buf) = self.release();
+
+        if i2s_rx.rx_channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok((i2s_rx, buf))
         }
+    }
+
+    fn release(self) -> (I2sRx<'d, Dm>, Buf) {
+        (
+            ManuallyDrop::into_inner(self.i2s_rx),
+            ManuallyDrop::into_inner(self.dma_buf),
+        )
+    }
 }
 
 /// Data types that the I2S peripheral can work with.
@@ -1052,26 +1088,10 @@ where
     }
 }
 
-impl<Dm> DmaSupport for I2sTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type DriverMode = Dm;
-
-    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
-        self.i2s.wait_for_tx_done();
-    }
-
-    fn peripheral_dma_stop(&mut self) {
-        self.i2s.tx_stop();
-    }
-}
-
 impl<'d, Dm> I2sTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-
     /// Perform a DMA write.
     #[allow(clippy::type_complexity)]
     #[instability::unstable]
@@ -1080,12 +1100,11 @@ where
         mut buffer: TX,
     ) -> Result<I2sTxDmaTransfer<'d, Dm, TX>, (Error, Self, TX)> {
         self.i2s.reset_tx();
-
         unsafe {
-            self.tx_channel.prepare_transfer(self.i2s.dma_peripheral(), &mut buffer);
+            self.tx_channel
+                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer);
             self.tx_channel.start_transfer();
         }
-
         self.i2s.tx_start();
 
         Ok(I2sTxDmaTransfer {
@@ -1127,21 +1146,6 @@ where
     }
 }
 
-impl<Dm> DmaSupport for I2sRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type DriverMode = Dm;
-
-    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
-        self.i2s.wait_for_rx_done();
-    }
-
-    fn peripheral_dma_stop(&mut self) {
-        self.i2s.reset_rx();
-    }
-}
-
 impl<'d, Dm> I2sRx<'d, Dm>
 where
     Dm: DriverMode,
@@ -1168,12 +1172,13 @@ where
         self.i2s.reset_rx();
 
         unsafe {
-            self.rx_channel.prepare_transfer(self.i2s.dma_peripheral(), &mut buffer);
+            self.rx_channel
+                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer);
             self.rx_channel.start_transfer();
         }
 
         // start: set I2S_RX_START
-        self.i2s.rx_start(usize::MAX); // what to use ... we don't know? at least if circular
+        self.i2s.rx_start(usize::MAX); // really limited by exhausting DMA rx buffer
 
         Ok(I2sRxDmaTransfer {
             i2s_rx: ManuallyDrop::new(self),
@@ -1209,7 +1214,7 @@ mod private {
     use crate::pac::i2s0::RegisterBlock;
     use crate::{
         DriverMode,
-        dma::{ChannelRx, ChannelTx, DescriptorChain, DmaDescriptor, DmaEligible},
+        dma::{ChannelRx, ChannelTx, DmaEligible},
         gpio::{
             InputConfig,
             InputSignal,
@@ -1600,6 +1605,9 @@ mod private {
                 w.tx_fifo_reset().bit(bit)
             });
 
+            #[cfg(esp32s2)]
+            while self.regs().conf().read().tx_reset_st().bit_is_set() {}
+
             self.regs().lc_conf().toggle(|w, bit| w.out_rst().bit(bit));
 
             self.regs().int_clr().write(|w| {
@@ -1611,17 +1619,21 @@ mod private {
         fn tx_start(&self) {
             self.regs().conf().modify(|_, w| w.tx_start().set_bit());
 
-            while self.regs().state().read().tx_idle().bit_is_set() {
-                // wait
-            }
+            // while self.regs().state().read().tx_idle().bit_is_set() {
+            //     // wait
+            // }
         }
 
         fn tx_stop(&self) {
             self.regs().conf().modify(|_, w| w.tx_start().clear_bit());
         }
 
+        fn is_tx_done(&self) -> bool {
+            self.regs().state().read().tx_idle().bit_is_set()
+        }
+
         fn wait_for_tx_done(&self) {
-            while self.regs().state().read().tx_idle().bit_is_clear() {
+            while !self.is_rx_done() {
                 // wait
             }
 
@@ -1633,6 +1645,9 @@ mod private {
                 w.rx_reset().bit(bit);
                 w.rx_fifo_reset().bit(bit)
             });
+
+            #[cfg(esp32s2)]
+            while self.regs().conf().read().rx_reset_st().bit_is_set() {}
 
             self.regs().lc_conf().toggle(|w, bit| w.in_rst().bit(bit));
 
@@ -1663,8 +1678,17 @@ mod private {
             self.regs().conf().modify(|_, w| w.rx_start().set_bit());
         }
 
+        fn rx_stop(&self) {
+            self.regs().conf().modify(|_, w| w.rx_start().clear_bit());
+        }
+
+        fn is_rx_done(&self) -> bool {
+            // self.regs().int_raw().read().in_suc_eof().bit_is_set()
+            self.regs().int_raw().read().in_dscr_empty().bit_is_set()
+        }
+
         fn wait_for_rx_done(&self) {
-            while self.regs().int_raw().read().in_suc_eof().bit_is_clear() {
+            while !self.is_rx_done() {
                 // wait
             }
 
@@ -2035,8 +2059,12 @@ mod private {
                 .modify(|_, w| w.tx_start().clear_bit());
         }
 
+        fn is_tx_done(&self) -> bool {
+            self.regs().state().read().tx_idle().bit_is_set()
+        }
+
         fn wait_for_tx_done(&self) {
-            while self.regs().state().read().tx_idle().bit_is_clear() {
+            while !self.is_tx_done() {
                 // wait
             }
 
@@ -2070,8 +2098,18 @@ mod private {
             self.regs().rx_conf().modify(|_, w| w.rx_start().set_bit());
         }
 
+        fn rx_stop(&self) {
+            self.regs()
+                .rx_conf()
+                .modify(|_, w| w.rx_start().clear_bit());
+        }
+
+        fn is_rx_done(&self) -> bool {
+            self.regs().int_raw().read().rx_done().bit_is_set()
+        }
+
         fn wait_for_rx_done(&self) {
-            while self.regs().int_raw().read().rx_done().bit_is_clear() {
+            while !self.is_rx_done() {
                 // wait
             }
 

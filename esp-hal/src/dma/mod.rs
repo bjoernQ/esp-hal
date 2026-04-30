@@ -1794,6 +1794,15 @@ where
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
 
+        // let mut x = preparation.start;
+        // loop {
+        //     info!("{:?}", &*x);
+        //     x = (&*x).next;
+        //     if x.is_null() {
+        //         break;
+        //     }
+        // }
+
         self.do_prepare(preparation, peri)
     }
 
