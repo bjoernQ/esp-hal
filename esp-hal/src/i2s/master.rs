@@ -219,14 +219,16 @@ where
 pub struct I2sRxDmaTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
+    Buf: DmaRxBuffer,
 {
     i2s_rx: ManuallyDrop<I2sRx<'d, Dm>>,
-    dma_buf: ManuallyDrop<Buf>,
+    dma_buf: ManuallyDrop<Buf::View>,
 }
 
 impl<'d, Dm, Buf> I2sRxDmaTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
+    Buf: DmaRxBuffer,
 {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
@@ -234,7 +236,7 @@ where
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
-    pub fn wait(mut self) -> Result<(I2sRx<'d, Dm>, Buf), DmaError> {
+    pub fn wait(mut self) -> Result<(I2sRx<'d, Dm>, Buf::Final), DmaError> {
         while !self.is_done() {}
 
         self.i2s_rx.rx_channel.stop_transfer();
@@ -245,15 +247,29 @@ where
         if i2s_rx.rx_channel.has_error() {
             Err(DmaError::DescriptorError)
         } else {
-            Ok((i2s_rx, buf))
+            Ok((i2s_rx, Buf::from_view(buf)))
         }
     }
 
-    fn release(self) -> (I2sRx<'d, Dm>, Buf) {
+    fn release(self) -> (I2sRx<'d, Dm>, Buf::View) {
         (
             ManuallyDrop::into_inner(self.i2s_rx),
             ManuallyDrop::into_inner(self.dma_buf),
         )
+    }
+}
+
+impl<Dm: DriverMode, BUF: DmaRxBuffer> core::ops::Deref for I2sRxDmaTransfer<'_, Dm, BUF> {
+    type Target = BUF::View;
+
+    fn deref(&self) -> &Self::Target {
+        &self.dma_buf
+    }
+}
+
+impl<Dm: DriverMode, BUF: DmaRxBuffer> core::ops::DerefMut for I2sRxDmaTransfer<'_, Dm, BUF> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.dma_buf
     }
 }
 
@@ -1182,7 +1198,7 @@ where
 
         Ok(I2sRxDmaTransfer {
             i2s_rx: ManuallyDrop::new(self),
-            dma_buf: ManuallyDrop::new(buffer),
+            dma_buf: ManuallyDrop::new(buffer.into_view()),
         })
     }
 
