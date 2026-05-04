@@ -173,14 +173,16 @@ pub(crate) const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_
 pub struct I2sTxDmaTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
+    Buf: DmaTxBuffer,
 {
     i2s_tx: ManuallyDrop<I2sTx<'d, Dm>>,
-    dma_buf: ManuallyDrop<Buf>,
+    dma_buf: ManuallyDrop<Buf::View>,
 }
 
 impl<'d, Dm, Buf> I2sTxDmaTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
+    Buf: DmaTxBuffer,
 {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
@@ -188,7 +190,7 @@ where
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
-    pub fn wait(mut self) -> Result<(I2sTx<'d, Dm>, Buf), DmaError> {
+    pub fn wait(mut self) -> Result<(I2sTx<'d, Dm>, Buf::Final), DmaError> {
         while !self.is_done() {}
 
         self.i2s_tx.tx_channel.stop_transfer();
@@ -199,15 +201,29 @@ where
         if i2s_tx.tx_channel.has_error() {
             Err(DmaError::DescriptorError)
         } else {
-            Ok((i2s_tx, buf))
+            Ok((i2s_tx, Buf::from_view(buf)))
         }
     }
 
-    fn release(self) -> (I2sTx<'d, Dm>, Buf) {
+    fn release(self) -> (I2sTx<'d, Dm>, Buf::View) {
         (
             ManuallyDrop::into_inner(self.i2s_tx),
             ManuallyDrop::into_inner(self.dma_buf),
         )
+    }
+}
+
+impl<Dm: DriverMode, BUF: DmaTxBuffer> core::ops::Deref for I2sTxDmaTransfer<'_, Dm, BUF> {
+    type Target = BUF::View;
+
+    fn deref(&self) -> &Self::Target {
+        &self.dma_buf
+    }
+}
+
+impl<Dm: DriverMode, BUF: DmaTxBuffer> core::ops::DerefMut for I2sTxDmaTransfer<'_, Dm, BUF> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.dma_buf
     }
 }
 
@@ -1125,7 +1141,7 @@ where
 
         Ok(I2sTxDmaTransfer {
             i2s_tx: ManuallyDrop::new(self),
-            dma_buf: ManuallyDrop::new(buffer),
+            dma_buf: ManuallyDrop::new(buffer.into_view()),
         })
     }
 
